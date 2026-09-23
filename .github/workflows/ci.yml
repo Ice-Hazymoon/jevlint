@@ -1,0 +1,71 @@
+name: CI
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+
+permissions:
+    contents: read
+
+jobs:
+    node:
+        name: Node ${{ matrix.node }}
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                node: [22, 24]
+        steps:
+            -   uses: actions/checkout@v4
+            -   uses: actions/setup-node@v4
+                with:
+                    node-version: ${{ matrix.node }}
+            -   run: npm install --no-audit --no-fund
+            -   run: npm run typecheck
+            # Tests use the replay provider and stubbed HTTP: no network, no API key.
+            -   run: npm test
+            -   run: npm run build
+            -   run: npm pack --dry-run
+
+    smoke:
+        name: Installed package
+        runs-on: ubuntu-latest
+        steps:
+            -   uses: actions/checkout@v4
+            -   uses: actions/setup-node@v4
+                with:
+                    node-version: 22
+            -   run: npm install --no-audit --no-fund
+            -   run: npm run build
+            -   run: npm pack
+            -   name: Smoke test
+                run: |
+                    mkdir "$RUNNER_TEMP/smoke" && cd "$RUNNER_TEMP/smoke"
+                    npm init -y > /dev/null
+                    npm install --no-audit --no-fund "$GITHUB_WORKSPACE"/jevlint-*.tgz typescript@^6
+                    npx jevlint --version
+                    npx jevlint init
+                    npx jevlint list
+                    set +e; npx jevlint test; code=$?; set -e
+                    test "$code" -eq 2 # no API key in CI: a clear error, exit 2
+
+    bun:
+        name: Bun
+        runs-on: ubuntu-latest
+        steps:
+            -   uses: actions/checkout@v4
+            -   uses: oven-sh/setup-bun@v2
+            -   run: bun install
+            -   run: bun run typecheck
+            -   run: bun run test
+            -   run: bun run build
+            -   run: npm pack
+            -   name: Smoke test on the Bun runtime
+                run: |
+                    mkdir "$RUNNER_TEMP/smoke" && cd "$RUNNER_TEMP/smoke"
+                    echo '{ "name": "smoke", "private": true }' > package.json
+                    bun add "$GITHUB_WORKSPACE"/jevlint-*.tgz typescript@^6
+                    bunx --bun jevlint --version
+                    bunx --bun jevlint init
+                    bunx --bun jevlint list

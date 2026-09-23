@@ -1,0 +1,77 @@
+{
+    "name": "jevlint",
+    "type": "module",
+    "version": "0.1.0",
+    "description": "Semantic lint rules for the code-review questions a deterministic linter can't express, answered as calibrated yes/no probabilities by TypeSafe's Jev.",
+    "author": "Ice-Hazymoon",
+    "license": "MIT",
+    "homepage": "https://github.com/Ice-Hazymoon/jevlint#readme",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/Ice-Hazymoon/jevlint.git"
+    },
+    "bugs": {
+        "url": "https://github.com/Ice-Hazymoon/jevlint/issues"
+    },
+    "keywords": [
+        "lint",
+        "linter",
+        "static-analysis",
+        "code-review",
+        "semantic",
+        "llm",
+        "ast-grep",
+        "typesafe",
+        "jev"
+    ],
+    "sideEffects": false,
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.mts",
+            "default": "./dist/index.mjs"
+        },
+        "./mutate": {
+            "types": "./dist/mutate.d.mts",
+            "default": "./dist/mutate.mjs"
+        },
+        "./prepare": {
+            "types": "./dist/prepare.d.mts",
+            "default": "./dist/prepare.mjs"
+        },
+        "./package.json": "./package.json"
+    },
+    "types": "./dist/index.d.mts",
+    "bin": {
+        "jevlint": "./dist/bin.mjs"
+    },
+    "files": [
+        "CHANGELOG.md",
+        "dist"
+    ],
+    "engines": {
+        "node": ">=22"
+    },
+    "scripts": {
+        "build": "tsdown",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run",
+        "prepublishOnly": "npm run build && npm test"
+    },
+    "peerDependencies": {
+        "typescript": "^5.0.0 || ^6.0.0"
+    },
+    "dependencies": {
+        "@ast-grep/napi": "^0.45.3",
+        "jiti": "^2.7.0",
+        "yaml": "^2.9.1"
+    },
+    "devDependencies": {
+        "@types/node": "^26.6.2",
+        "tsdown": "^0.23.0",
+        "typescript": "^6.0.3",
+        "vitest": "^5.0.1"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
+}
