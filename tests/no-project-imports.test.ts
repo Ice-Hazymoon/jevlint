@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = join(import.meta.dirname, '..');
 const manifest = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8')) as { name: string; dependencies?: Record<string, string>; peerDependencies?: Record<string, string> };
-// The package's own name appears in `jevlint init`'s generated config text.
+// The package's own name appears in `jevcheck init`'s generated config text.
 const DECLARED = new Set([manifest.name, ...Object.keys(manifest.dependencies ?? {}), ...Object.keys(manifest.peerDependencies ?? {})]);
 
 function listTsFiles(dir: string, out: string[] = []): string[] {

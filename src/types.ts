@@ -1,5 +1,5 @@
 /**
- * jevlint rule types — a rule is one audit question compiled into an atomic
+ * jevcheck rule types — a rule is one audit question compiled into an atomic
  * yes/no question for Jev (TypeSafe System One). "Yes" always means VIOLATION.
  */
 
@@ -122,12 +122,12 @@ export interface JevRule {
     /**
      * The rule is decidable by AST / regex / file layout and is only here
      * as stopgap coverage until a deterministic linter implements it.
-     * Listed by `jevlint list`.
+     * Listed by `jevcheck list`.
      */
     deterministicCandidate?: string;
     /**
      * Deterministic edit of the chunk text before it is sent (see
-     * `jevlint/prepare`). Must keep the line count. Rules sharing a chunk
+     * `jevcheck/prepare`). Must keep the line count. Rules sharing a chunk
      * but not a `prepare` are asked in separate requests.
      */
     prepare?: (text: string) => string;

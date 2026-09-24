@@ -1,13 +1,13 @@
-# jevlint
+# jevcheck
 
-Lint rules for the code-review questions a syntax-based linter can't answer: "is a secret being logged here?", "can this retry loop run forever?", "does this handler leak an internal error message?". You write each rule as a plain-English yes/no question. jevlint picks the code the rule applies to, asks [TypeSafe](https://typesafe.ai)'s Jev model, and reports a calibrated probability rather than free text. Each rule is tested against fixtures, answers are cached, and output looks like any other linter's: files, lines, rule ids and exit codes.
+Lint rules for the code-review questions a syntax-based linter can't answer: "is a secret being logged here?", "can this retry loop run forever?", "does this handler leak an internal error message?". You write each rule as a plain-English yes/no question. jevcheck picks the code the rule applies to, asks [TypeSafe](https://typesafe.ai)'s Jev model, and reports a calibrated probability rather than free text. Each rule is tested against fixtures, answers are cached, and output looks like any other linter's: files, lines, rule ids and exit codes.
 
 Use it alongside ESLint, not instead of it. If a rule can be decided from syntax alone, a deterministic linter is cheaper and exact.
 
 ## Install
 
 ```sh
-npm install --save-dev jevlint typescript
+npm install --save-dev jevcheck typescript
 ```
 
 Requires Node.js 22+ or Bun. `typescript` (5.x or 6.x) is a peer dependency.
@@ -15,10 +15,10 @@ Requires Node.js 22+ or Bun. `typescript` (5.x or 6.x) is a peer dependency.
 ## Quick start
 
 ```sh
-npx jevlint init                   # jevlint.config.ts + an example rule + two fixtures
+npx jevcheck init                   # jevcheck.config.ts + an example rule + two fixtures
 export AI_GATEWAY_API_KEY=...      # or TYPESAFE_API_KEY, see "Providers and keys"
-npx jevlint test                   # the example rule must pass its own fixtures
-npx jevlint                        # scan the current directory
+npx jevcheck test                   # the example rule must pass its own fixtures
+npx jevcheck                        # scan the current directory
 ```
 
 On a file the rule fires on (a `logger.info` call carrying a `password`), a scan reports:
@@ -39,8 +39,8 @@ src/auth/login.ts
 A rule is one narrow question about "the code in `code`", phrased so that **yes means violation**.
 
 ```ts
-// jevlint.config.ts
-import { defineConfig, defineRule } from 'jevlint';
+// jevcheck.config.ts
+import { defineConfig, defineRule } from 'jevcheck';
 
 const noSecretInLog = defineRule({
     id: 'logging/no-secret-in-log',
@@ -63,18 +63,18 @@ export default defineConfig({ rules: [noSecretInLog] });
 Every rule needs at least one `invalid-*` fixture (it must fire) and one `valid-*` fixture (it must not). The first line gives the path the snippet pretends to live at:
 
 ```ts
-// jevlint/fixtures/logging__no-secret-in-log/invalid-password.txt
+// jevcheck/fixtures/logging__no-secret-in-log/invalid-password.txt
 // path: src/auth/login.ts
 logger.info('login attempt', { email, password });
 ```
 
 ```ts
-// jevlint/fixtures/logging__no-secret-in-log/valid-email-only.txt
+// jevcheck/fixtures/logging__no-secret-in-log/valid-email-only.txt
 // path: src/auth/login.ts
 logger.info('login attempt', { email });
 ```
 
-`jevlint test` runs them. `exempt-*` fixtures check `exemptions`, which are named exceptions that the model is asked about separately.
+`jevcheck test` runs them. `exempt-*` fixtures check `exemptions`, which are named exceptions that the model is asked about separately.
 
 Beyond the required fields, a rule can use:
 
@@ -86,27 +86,27 @@ Beyond the required fields, a rule can use:
 | `exemptions` | Legitimate exceptions, each asked as its own question. A hit is exempted when any of them answers ≥ 0.5. |
 | `threshold` | Report at or above this probability. Default `0.8`. |
 | `confirm` | What a reviewer should check before acting. Printed with each hit. |
-| `mutants` | Recall probes for `jevlint recall` (helpers in `jevlint/mutate`). |
-| `prepare` | Deterministic edit of the text before it's sent (helpers in `jevlint/prepare`). |
+| `mutants` | Recall probes for `jevcheck recall` (helpers in `jevcheck/mutate`). |
+| `prepare` | Deterministic edit of the text before it's sent (helpers in `jevcheck/prepare`). |
 | `status` | `owned` (trusted; used by `hook` and `--owned`) or `shadow` (still being tuned). |
 | `source` | Where the rule comes from (a doc section, a ticket, a team convention), printed with each hit. Free text, optional. |
 | `exclude` | Globs excluded even when `files` matches. |
-| `deterministicCandidate` | Note that a deterministic linter could decide this rule instead; listed by `jevlint list`. |
+| `deterministicCandidate` | Note that a deterministic linter could decide this rule instead; listed by `jevcheck list`. |
 
 ## Configuration
 
-`jevlint.config.{ts,mts,js,mjs}` is found by walking up from the current directory, or passed with `--config`. Paths are relative to the config file.
+`jevcheck.config.{ts,mts,js,mjs}` is found by walking up from the current directory, or passed with `--config`. Paths are relative to the config file.
 
 | Option | Default | |
 | --- | --- | --- |
 | `rules` | (required) | Your rules. Ids must be unique. |
 | `include` | `DEFAULT_INCLUDE` (`**/*.{ts,tsx,mts,vue}`) | Files that may be scanned. |
 | `ignore` | `DEFAULT_IGNORE` (`node_modules`, `dist`, `build`, caches, `*.d.ts`, `.env*`, ...) | Files never scanned. |
-| `fixtures` | `jevlint/fixtures` | Fixture directory (`<rule id with / as __>/`). |
-| `calibration` | `jevlint/calibration.json` | Written by `test --record`, read by `test --drift`. |
-| `baseline` | `jevlint/baseline.json` | Written by `jevlint baseline`. |
-| `cacheDir` | `$XDG_CACHE_HOME/jevlint` or `~/.cache/jevlint` | Answer and verdict cache. |
-| `suppression` | `jevlint-ignore` | Inline marker: `// jevlint-ignore <rule id> -- <reason>` (the reason is required). |
+| `fixtures` | `jevcheck/fixtures` | Fixture directory (`<rule id with / as __>/`). |
+| `calibration` | `jevcheck/calibration.json` | Written by `test --record`, read by `test --drift`. |
+| `baseline` | `jevcheck/baseline.json` | Written by `jevcheck baseline`. |
+| `cacheDir` | `$XDG_CACHE_HOME/jevcheck` or `~/.cache/jevcheck` | Answer and verdict cache. |
+| `suppression` | `jevcheck-ignore` | Inline marker: `// jevcheck-ignore <rule id> -- <reason>` (the reason is required). |
 | `provider` | gateway if `AI_GATEWAY_API_KEY` is set, else typesafe | See below. |
 | `concurrency` / `tokensPerSecond` | `48` / `230000` | Request pacing. |
 | `reporters` | `[]` | `{ name, onRunComplete(result) }` hooks called after every scan. |
@@ -117,17 +117,17 @@ Mistakes are reported with the field name, for example `rules[0] ("logging/x"): 
 
 | Command | |
 | --- | --- |
-| `jevlint [paths...]` | Scan (default: the current directory). `--changed`, `--staged` and `--base <ref>` scan git changes. `--format stylish\|json\|sarif`. `--no-baseline`, `--no-locate` and `--no-prefilter` skip the baseline, the localization pass or the prefilter gates (`jevlint --help` for all options). |
-| `jevlint test` | Run fixtures. `--record` saves probabilities; `--drift` asks again and compares. |
-| `jevlint recall` | Mutate real files and measure how many violations are caught. |
-| `jevlint baseline [paths...]` | Accept the current hits; every later scan then reports only new ones. |
-| `jevlint list` | List rules. |
-| `jevlint verify <claims.json>` | Check statements about code against the lines they cite. |
-| `jevlint cache prune` | Delete old cache entries. |
-| `jevlint hook` | Post-edit hook for coding agents and editors. Reads `{"file_path": "..."}` on stdin and exits 2 with the hits on stderr. |
-| `jevlint init` | Scaffold a config, an example rule and fixtures. |
+| `jevcheck [paths...]` | Scan (default: the current directory). `--changed`, `--staged` and `--base <ref>` scan git changes. `--format stylish\|json\|sarif`. `--no-baseline`, `--no-locate` and `--no-prefilter` skip the baseline, the localization pass or the prefilter gates (`jevcheck --help` for all options). |
+| `jevcheck test` | Run fixtures. `--record` saves probabilities; `--drift` asks again and compares. |
+| `jevcheck recall` | Mutate real files and measure how many violations are caught. |
+| `jevcheck baseline [paths...]` | Accept the current hits; every later scan then reports only new ones. |
+| `jevcheck list` | List rules. |
+| `jevcheck verify <claims.json>` | Check statements about code against the lines they cite. |
+| `jevcheck cache prune` | Delete old cache entries. |
+| `jevcheck hook` | Post-edit hook for coding agents and editors. Reads `{"file_path": "..."}` on stdin and exits 2 with the hits on stderr. |
+| `jevcheck init` | Scaffold a config, an example rule and fixtures. |
 
-`jevlint --help` and `jevlint <command> --help` list every option. Exit codes: `0` no error-severity hit, `1` at least one error-severity hit, `2` usage or runtime error.
+`jevcheck --help` and `jevcheck <command> --help` list every option. Exit codes: `0` no error-severity hit, `1` at least one error-severity hit, `2` usage or runtime error.
 
 ## Providers and keys
 
@@ -137,7 +137,7 @@ Mistakes are reported with the field name, for example `rules[0] ("logging/x"): 
 | `{ kind: 'typesafe', model? }` | `TYPESAFE_API_KEY` | api.typesafe.ai, pinned to a model version. |
 | `{ kind: 'replay', model? }` | none | Cache only. A missing answer is an error, and nothing is sent. |
 
-**Security.** The text of every judged chunk (source code, plus the file path) is sent to the provider. Don't scan code you aren't allowed to share with it. Keys are read only from the environment variable named above: jevlint never reads `.env` files and never logs keys. If you keep keys in a dotenv file, load it yourself before running jevlint.
+**Security.** The text of every judged chunk (source code, plus the file path) is sent to the provider. Don't scan code you aren't allowed to share with it. Keys are read only from the environment variable named above: jevcheck never reads `.env` files and never logs keys. If you keep keys in a dotenv file, load it yourself before running jevcheck.
 
 ## CI
 
@@ -146,50 +146,50 @@ Answers are cached by model, question and exact code, so a re-scan of unchanged 
 ```yaml
 - uses: actions/cache@v4
   with:
-    path: ~/.cache/jevlint
-    key: jevlint-${{ github.sha }}
-    restore-keys: jevlint-
-- run: npx jevlint --base origin/main --format sarif > jevlint.sarif
+    path: ~/.cache/jevcheck
+    key: jevcheck-${{ github.sha }}
+    restore-keys: jevcheck-
+- run: npx jevcheck --base origin/main --format sarif > jevcheck.sarif
   env:
     AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
 - uses: github/codeql-action/upload-sarif@v3
   if: always()
   with:
-    sarif_file: jevlint.sarif
+    sarif_file: jevcheck.sarif
 ```
 
-- Every scan applies the baseline by default, so CI fails only on new hits. Commit `jevlint/baseline.json` after `jevlint baseline`.
+- Every scan applies the baseline by default, so CI fails only on new hits. Commit `jevcheck/baseline.json` after `jevcheck baseline`.
 - To test rules without a key or network (for example on forks), point `cacheDir` at a committed directory and use `provider: { kind: 'replay' }`.
 
 ## Programmatic API
 
 ```ts
-import { createJevlint, loadConfig } from 'jevlint';
+import { createJevcheck, loadConfig } from 'jevcheck';
 
-const jevlint = createJevlint(await loadConfig());
-const result = await jevlint.lint(['src/server.ts'], { owned: true });
+const jevcheck = createJevcheck(await loadConfig());
+const result = await jevcheck.lint(['src/server.ts'], { owned: true });
 for (const hit of result.hits) console.log(hit.file, hit.startLine, hit.rule, hit.probability);
 
-await jevlint.test();                                  // fixtures
-await jevlint.recall({ files: ['src/server.ts'] });    // mutation recall
+await jevcheck.test();                                  // fixtures
+await jevcheck.recall({ files: ['src/server.ts'] });    // mutation recall
 ```
 
 For a config built in code, use `resolveConfig(defineConfig({ ... }), rootDir)`. All types (`JevRule`, `LintRunResult`, ...) are exported and documented.
 
 ## Calibration and recall
 
-- **Calibration:** `jevlint test --record` stores each fixture's probability. The gateway model can change without notice, so `jevlint test --drift` asks again without the cache and lists fixtures that moved by 0.10 or more. Fixtures that pass by less than 0.05 are flagged as thin margins.
-- **Recall:** fixtures show a question can work; recall shows it works on your code. Each `mutants` entry turns real compliant code into a violation (for example, removing a timeout). `jevlint recall` judges a deterministic sample of mutated files and reports the share caught. Aim for 0.9 or higher before marking a rule `owned`.
+- **Calibration:** `jevcheck test --record` stores each fixture's probability. The gateway model can change without notice, so `jevcheck test --drift` asks again without the cache and lists fixtures that moved by 0.10 or more. Fixtures that pass by less than 0.05 are flagged as thin margins.
+- **Recall:** fixtures show a question can work; recall shows it works on your code. Each `mutants` entry turns real compliant code into a violation (for example, removing a timeout). `jevcheck recall` judges a deterministic sample of mutated files and reports the share caught. Aim for 0.9 or higher before marking a rule `owned`.
 
   ```ts
-  import { dropMethodCalls } from 'jevlint/mutate';
+  import { dropMethodCalls } from 'jevcheck/mutate';
 
   // On a rule requiring a bounded query, this drops `.limit(...)` from a real compliant call.
   mutants: [{ id: 'drop-limit', apply: text => dropMethodCalls(text, 'limit') }],
   ```
 
   ```text
-  $ jevlint recall
+  $ jevcheck recall
   security/bounded-query  drop-limit  9/10  recall=0.90
   ```
 

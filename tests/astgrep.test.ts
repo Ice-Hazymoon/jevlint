@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { AstGrepRuleError, findAstMatches, validateAstGrepRule } from '../src/astGrep.js';
 import { buildCandidateText, candidateMapsForText, findMatches, selectRelated } from '../src/candidates.js';
-import { JevlintConfigError, resolveConfig } from '../src/config.js';
+import { JevcheckConfigError, resolveConfig } from '../src/config.js';
 
 function rule(candidates: JevRule['candidates']): JevRule {
     return { id: 'demo/rule', severity: 'warning', status: 'owned', why: 'w', files: ['**/*'], question: 'q', criteria: { true: 't', false: 'f' }, fix: 'f', candidates };
@@ -58,7 +58,7 @@ describe('findAstMatches', () => {
 
 describe('candidates over files and text', () => {
     it('reads the <script> block of a .vue file with true line numbers and keeps only outermost matches', () => {
-        const dir = mkdtempSync(join(tmpdir(), 'jevlint-astgrep-'));
+        const dir = mkdtempSync(join(tmpdir(), 'jevcheck-astgrep-'));
         try {
             writeFileSync(join(dir, 'A.vue'), '<template>\n  <p>{{ console.log(x) }}</p>\n</template>\n<script setup lang="ts">\nconsole.log(fmt(\n    console.log(y),\n));\n</script>\n');
             writeFileSync(join(dir, 'b.md'), 'console.log(z)\n');
@@ -104,7 +104,7 @@ describe('candidates over files and text', () => {
 
 describe('config validation of candidate rules', () => {
     it('names the rule and field of an invalid ast-grep rule', () => {
-        expect(() => resolveConfig({ rules: [rule({ rule: 'kind: not_a_real_node_kind' })] }, '/project')).toThrow(JevlintConfigError);
+        expect(() => resolveConfig({ rules: [rule({ rule: 'kind: not_a_real_node_kind' })] }, '/project')).toThrow(JevcheckConfigError);
         expect(() => resolveConfig({ rules: [rule({ rule: 'pattern: a', related: { rule: 'pattern: [', label: 'x' } })] }, '/project')).toThrow(/"demo\/rule"\): "candidates.related.rule" is not a valid ast-grep rule/);
         expect(() => resolveConfig({ rules: [rule({ rule: 'pattern: a', related: { rule: 'pattern: b', label: 'x', linkBy: '$NAME' } })] }, '/project')).toThrow(/linkBy/);
     });

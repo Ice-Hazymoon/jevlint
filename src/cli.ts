@@ -1,17 +1,17 @@
 import type { RecallMutantResult, TestResult } from './api.js';
-import type { ResolvedJevlintConfig } from './config.js';
+import type { ResolvedJevcheckConfig } from './config.js';
 import type { LintRunResult } from './reporters.js';
 import type { JevRule } from './types.js';
 import type { Claim } from './verify.js';
 /**
- * The `jevlint` command line: argument parsing, file selection and output. Every command is a thin
+ * The `jevcheck` command line: argument parsing, file selection and output. Every command is a thin
  * layer over the programmatic API in `api.ts`.
  */
 /* eslint-disable no-console -- a CLI's output is console output */
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
-import { createJevlint } from './api.js';
+import { createJevcheck } from './api.js';
 import { matchesGlobs } from './candidates.js';
 import { findConfigFile, loadConfig } from './config.js';
 import { createStyle, formatStylish } from './reporters.js';
@@ -29,7 +29,7 @@ const SCOPE: readonly OptionSpec[] = [
 
 const COMMANDS: Record<string, CommandSpec> = {
     scan: {
-        usage: 'jevlint [paths...] [options]',
+        usage: 'jevcheck [paths...] [options]',
         summary: 'Scan files and directories (default: the current directory).',
         details: 'Applies the baseline file to every scan, so only new hits are reported. Use --no-baseline to see everything.',
         options: [
@@ -45,7 +45,7 @@ const COMMANDS: Record<string, CommandSpec> = {
         ],
     },
     test: {
-        usage: 'jevlint test [options]',
+        usage: 'jevcheck test [options]',
         summary: 'Run every rule against its fixtures.',
         details: 'Fixtures live in <fixtures>/<rule id with "/" as "__">/ and are named invalid-*.txt (must fire), valid-*.txt (must not) or exempt-*.txt (an exemption must apply). The first line of each is "// path: <file path the snippet pretends to be at>".',
         options: [
@@ -55,7 +55,7 @@ const COMMANDS: Record<string, CommandSpec> = {
         ],
     },
     recall: {
-        usage: 'jevlint recall [options]',
+        usage: 'jevcheck recall [options]',
         summary: 'Inject violations into real files with each rule\'s mutants and count how many are caught.',
         options: [
             RULES,
@@ -64,42 +64,42 @@ const COMMANDS: Record<string, CommandSpec> = {
         ],
     },
     baseline: {
-        usage: 'jevlint baseline [paths...] [options]',
+        usage: 'jevcheck baseline [paths...] [options]',
         summary: 'Record the current hits as accepted, so later scans report only new ones.',
         details: 'A plain scan (baseline applied by default) then reports only hits not in the baseline.',
         options: [...SCOPE, RULES, OWNED],
     },
     list: {
-        usage: 'jevlint list [options]',
+        usage: 'jevcheck list [options]',
         summary: 'List the configured rules.',
         options: [RULES, OWNED],
     },
     verify: {
-        usage: 'jevlint verify <claims.json> [options]',
+        usage: 'jevcheck verify <claims.json> [options]',
         summary: 'Check statements about code against the lines they cite.',
         details: 'claims.json is an array of { "id", "file", "startLine"?, "endLine"?, "claim", "quote"? }. Each claim is reported as verified, contradicted, unsupported, review, fabricated (missing file, range or quote) or invalid.',
         options: [{ name: 'format', value: 'name', help: 'text (default) or json' }],
     },
     cache: {
-        usage: 'jevlint cache prune [options]',
+        usage: 'jevcheck cache prune [options]',
         summary: 'Delete cache entries that were not used recently.',
         options: [{ name: 'max-age-days', value: 'n', help: 'keep entries used within this many days (default 30)' }],
     },
     hook: {
-        usage: 'jevlint hook',
+        usage: 'jevcheck hook',
         summary: 'Post-edit hook for coding agents and editors: judge one edited file with the owned rules.',
         details: 'Reads a JSON object from stdin carrying the edited file\'s path as "file_path", "path" or "file", at the top level or under "tool_input" / "input". Exits 2 with the hits on stderr when an owned rule fires, 0 otherwise. Its own failures are printed on stderr but never block the edit (exit 0).',
         options: [],
     },
     init: {
-        usage: 'jevlint init',
-        summary: 'Create jevlint.config.ts with an example rule and its fixtures in the current directory.',
+        usage: 'jevcheck init',
+        summary: 'Create jevcheck.config.ts with an example rule and its fixtures in the current directory.',
         options: [],
     },
 };
 
 const GLOBAL_OPTIONS: readonly OptionSpec[] = [
-    { name: 'config', value: 'path', help: 'config file (default: nearest jevlint.config.{ts,mts,js,mjs} upward from the current directory)' },
+    { name: 'config', value: 'path', help: 'config file (default: nearest jevcheck.config.{ts,mts,js,mjs} upward from the current directory)' },
     { name: 'help', help: 'show help' },
 ];
 
@@ -176,7 +176,7 @@ export function helpText(command: string): string {
     if (command === 'scan') {
         lines.push('', 'Commands:');
         for (const [name, other] of Object.entries(COMMANDS).filter(([name]) => name !== 'scan')) { lines.push(`  ${(name === 'cache' ? 'cache prune' : name).padEnd(22)} ${other.summary}`); }
-        lines.push('', 'Run "jevlint <command> --help" for a command\'s options.');
+        lines.push('', 'Run "jevcheck <command> --help" for a command\'s options.');
     }
     if (spec.options.length > 0) { lines.push('', 'Options:', ...optionLines(spec.options)); }
     lines.push('', 'Global options:', ...optionLines(GLOBAL_OPTIONS));
@@ -206,7 +206,7 @@ function walk(path: string, out: string[]): void {
     }
 }
 
-function git(config: ResolvedJevlintConfig, args: readonly string[]): string[] {
+function git(config: ResolvedJevcheckConfig, args: readonly string[]): string[] {
     try {
         return execFileSync('git', args, { cwd: config.root, encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }).split('\n').filter(Boolean);
     } catch (err: unknown) {
@@ -218,7 +218,7 @@ function git(config: ResolvedJevlintConfig, args: readonly string[]): string[] {
 }
 
 /** The files a scan or baseline run covers, relative to the config root, filtered by `include` / `ignore`. */
-function collectFiles(args: ParsedArgs, config: ResolvedJevlintConfig): string[] {
+function collectFiles(args: ParsedArgs, config: ResolvedJevcheckConfig): string[] {
     const files: string[] = [];
     const base = args.values.get('base');
     if (args.flags.has('changed')) { files.push(...git(config, ['diff', '--name-only', '--diff-filter=d', 'HEAD']), ...git(config, ['ls-files', '--others', '--exclude-standard'])); }
@@ -247,9 +247,9 @@ function toSarif(result: LintRunResult, rules: readonly JevRule[]): unknown {
         runs: [{
             tool: {
                 driver: {
-                    name: 'jevlint',
+                    name: 'jevcheck',
                     version: VERSION,
-                    informationUri: 'https://github.com/Ice-Hazymoon/jevlint',
+                    informationUri: 'https://github.com/Ice-Hazymoon/jevcheck',
                     rules: used.map((id) => {
                         const rule = byId.get(id)!;
                         return { id, name: id, shortDescription: { text: rule.why }, help: { text: rule.fix }, defaultConfiguration: { level: rule.severity } };
@@ -268,11 +268,11 @@ function toSarif(result: LintRunResult, rules: readonly JevRule[]): unknown {
     };
 }
 
-async function runScan(args: ParsedArgs, config: ResolvedJevlintConfig): Promise<number> {
+async function runScan(args: ParsedArgs, config: ResolvedJevcheckConfig): Promise<number> {
     const format = args.values.get('format') ?? 'stylish';
     if (!['stylish', 'json', 'sarif'].includes(format)) { throw new UsageError(`--format must be stylish, json or sarif, got '${format}'`, 'scan'); }
     const files = collectFiles(args, config);
-    const result = await createJevlint({ ...config, reporters: [] }).lint(files, {
+    const result = await createJevcheck({ ...config, reporters: [] }).lint(files, {
         rules: ruleIds(args),
         owned: args.flags.has('owned'),
         useBaseline: !args.flags.has('no-baseline'),
@@ -294,7 +294,7 @@ async function runScan(args: ParsedArgs, config: ResolvedJevlintConfig): Promise
     return result.hits.some(hit => hit.severity === 'error') ? 1 : 0;
 }
 
-function printTestResult(result: TestResult, config: ResolvedJevlintConfig): boolean {
+function printTestResult(result: TestResult, config: ResolvedJevcheckConfig): boolean {
     const style = createStyle();
     const width = Math.min(70, Math.max(0, ...result.cases.map(c => c.key.length)));
     for (const c of result.cases) { console.log(`${c.ok ? style.green('pass') : style.red('FAIL')}  ${c.key.padEnd(width)}  ${style.dim(c.detail)}${c.thinMargin ? style.yellow('  thin margin') : ''}`); }
@@ -308,12 +308,12 @@ function printTestResult(result: TestResult, config: ResolvedJevlintConfig): boo
     return failed;
 }
 
-async function runTest(args: ParsedArgs, config: ResolvedJevlintConfig): Promise<number> {
-    const result = await createJevlint(config).test({ rules: ruleIds(args), record: args.flags.has('record'), drift: args.flags.has('drift') });
+async function runTest(args: ParsedArgs, config: ResolvedJevcheckConfig): Promise<number> {
+    const result = await createJevcheck(config).test({ rules: ruleIds(args), record: args.flags.has('record'), drift: args.flags.has('drift') });
     return printTestResult(result, config) ? 1 : 0;
 }
 
-function trackedFiles(config: ResolvedJevlintConfig): string[] {
+function trackedFiles(config: ResolvedJevcheckConfig): string[] {
     try {
         return git(config, ['ls-files']);
     } catch {
@@ -331,10 +331,10 @@ function mutantLines(m: RecallMutantResult, dry: boolean, style: ReturnType<type
     return [`${head}  ${(m.graduates ? style.green : style.yellow)(rate)}`, ...m.misses.map(miss => `    missed: ${miss}`), ...m.invalidMutants.map(item => `    invalid mutant: ${item}`)];
 }
 
-async function runRecall(args: ParsedArgs, config: ResolvedJevlintConfig): Promise<number> {
+async function runRecall(args: ParsedArgs, config: ResolvedJevcheckConfig): Promise<number> {
     const style = createStyle();
     const dry = args.flags.has('dry');
-    const result = await createJevlint(config).recall({ rules: ruleIds(args), files: trackedFiles(config), sampleSize: positiveInteger(args, 'sample', 12), dry });
+    const result = await createJevcheck(config).recall({ rules: ruleIds(args), files: trackedFiles(config), sampleSize: positiveInteger(args, 'sample', 12), dry });
     if (result.mutants.length === 0) {
         console.log('No selected rule declares mutants, so there is nothing to measure.');
         return 0;
@@ -345,16 +345,16 @@ async function runRecall(args: ParsedArgs, config: ResolvedJevlintConfig): Promi
     return result.weakestRecall < 0.9 ? 1 : 0;
 }
 
-async function runBaseline(args: ParsedArgs, config: ResolvedJevlintConfig): Promise<number> {
+async function runBaseline(args: ParsedArgs, config: ResolvedJevcheckConfig): Promise<number> {
     const files = collectFiles(args, config);
-    const { hitsWritten, totalEntries } = await createJevlint(config).baseline(files, { rules: ruleIds(args), owned: args.flags.has('owned') });
+    const { hitsWritten, totalEntries } = await createJevcheck(config).baseline(files, { rules: ruleIds(args), owned: args.flags.has('owned') });
     console.log(`Accepted ${hitsWritten} hit(s) from ${files.length} file(s); ${relative(process.cwd(), config.baseline)} now has ${totalEntries} entr${totalEntries === 1 ? 'y' : 'ies'}.`);
     return 0;
 }
 
-function runList(args: ParsedArgs, config: ResolvedJevlintConfig): number {
+function runList(args: ParsedArgs, config: ResolvedJevcheckConfig): number {
     const style = createStyle();
-    const rules = createJevlint(config).listRules({ rules: ruleIds(args), owned: args.flags.has('owned') });
+    const rules = createJevcheck(config).listRules({ rules: ruleIds(args), owned: args.flags.has('owned') });
     const width = Math.max(0, ...rules.map(rule => rule.id.length));
     for (const rule of rules) {
         const notes = [rule.source, rule.deterministicCandidate ? `deterministic candidate: ${rule.deterministicCandidate}` : ''].filter(Boolean).join(' · ');
@@ -377,12 +377,12 @@ function parseClaims(path: string): Claim[] {
     });
 }
 
-async function runVerify(args: ParsedArgs, config: ResolvedJevlintConfig): Promise<number> {
+async function runVerify(args: ParsedArgs, config: ResolvedJevcheckConfig): Promise<number> {
     const [path, ...extra] = args.positionals;
     if (!path || extra.length > 0) { throw new UsageError('verify needs exactly one claims file', 'verify'); }
     const format = args.values.get('format') ?? 'text';
     if (format !== 'text' && format !== 'json') { throw new UsageError(`--format must be text or json, got '${format}'`, 'verify'); }
-    const { verdicts, requests, inputTokens } = await createJevlint(config).verify(parseClaims(path));
+    const { verdicts, requests, inputTokens } = await createJevcheck(config).verify(parseClaims(path));
     const verified = verdicts.filter(item => item.verdict === 'verified').length;
     if (format === 'json') {
         console.log(JSON.stringify(verdicts, null, 2));
@@ -393,9 +393,9 @@ async function runVerify(args: ParsedArgs, config: ResolvedJevlintConfig): Promi
     return verified === verdicts.length ? 0 : 1;
 }
 
-function runCache(args: ParsedArgs, config: ResolvedJevlintConfig): number {
-    if (args.positionals[0] !== 'prune' || args.positionals.length > 1) { throw new UsageError('the only cache command is "jevlint cache prune"', 'cache'); }
-    const { removed, kept } = createJevlint(config).pruneCache(positiveInteger(args, 'max-age-days', 30));
+function runCache(args: ParsedArgs, config: ResolvedJevcheckConfig): number {
+    if (args.positionals[0] !== 'prune' || args.positionals.length > 1) { throw new UsageError('the only cache command is "jevcheck cache prune"', 'cache'); }
+    const { removed, kept } = createJevcheck(config).pruneCache(positiveInteger(args, 'max-age-days', 30));
     console.log(`${config.cacheDir}: removed ${removed} entr${removed === 1 ? 'y' : 'ies'}, kept ${kept}.`);
     return 0;
 }
@@ -423,24 +423,24 @@ async function runHook(configPath: string | undefined): Promise<number> {
         const cwd = typeof (payload as { cwd?: unknown }).cwd === 'string' ? (payload as { cwd: string }).cwd : process.cwd();
         const file = relative(config.root, resolve(cwd, path)).split(sep).join('/');
         if (file.startsWith('../') || !matchesGlobs(config.include, file) || matchesGlobs(config.ignore, file) || !existsSync(join(config.root, file))) { return 0; }
-        const result = await createJevlint(config).lint([file], { owned: true, useBaseline: true });
+        const result = await createJevcheck(config).lint([file], { owned: true, useBaseline: true });
         if (result.hits.length === 0) { return 0; }
         const report = result.hits.map(hit => `${hit.file}:${hit.startLine}-${hit.endLine} ${hit.rule} (p=${hit.probability.toFixed(2)})\n  why: ${hit.why}\n  fix: ${hit.fix}${hit.confirm ? `\n  confirm first: ${hit.confirm}` : ''}`).join('\n');
-        console.error(`jevlint: ${result.hits.length} rule hit(s) in the file just edited. Check each against the code, then fix it or say why it does not apply.\n${report}`);
+        console.error(`jevcheck: ${result.hits.length} rule hit(s) in the file just edited. Check each against the code, then fix it or say why it does not apply.\n${report}`);
         return 2;
     } catch (err: unknown) {
-        console.error(`jevlint hook: ${err instanceof Error ? err.message : String(err)}`);
+        console.error(`jevcheck hook: ${err instanceof Error ? err.message : String(err)}`);
         return 0;
     }
 }
 
-const EXAMPLE_CONFIG = `import { defineConfig, defineRule } from 'jevlint';
+const EXAMPLE_CONFIG = `import { defineConfig, defineRule } from 'jevcheck';
 
 // A rule is one yes/no question about a piece of code; "yes" means a violation.
 const noSecretInLog = defineRule({
     id: 'example/no-secret-in-log',
     severity: 'error',
-    // "owned": trusted and used by \`jevlint hook\`. Use "shadow" while a rule is still being tuned.
+    // "owned": trusted and used by \`jevcheck hook\`. Use "shadow" while a rule is still being tuned.
     status: 'owned',
     why: 'Secrets written to logs spread to log storage, alerts and backups, which are much harder to purge than code.',
     files: ['**/*.{ts,tsx,mts,vue}'],
@@ -456,7 +456,7 @@ const noSecretInLog = defineRule({
 
 export default defineConfig({
     rules: [noSecretInLog],
-    // Everything else has a default. See https://github.com/Ice-Hazymoon/jevlint#configuration
+    // Everything else has a default. See https://github.com/Ice-Hazymoon/jevcheck#configuration
 });
 `;
 
@@ -486,17 +486,17 @@ function runInit(): number {
         writeFileSync(path, content);
         written.push(relative(cwd, path));
     };
-    write(join(cwd, 'jevlint.config.ts'), EXAMPLE_CONFIG);
-    for (const [name, content] of Object.entries(EXAMPLE_FIXTURES)) { write(join(cwd, 'jevlint/fixtures/example__no-secret-in-log', name), content); }
+    write(join(cwd, 'jevcheck.config.ts'), EXAMPLE_CONFIG);
+    for (const [name, content] of Object.entries(EXAMPLE_FIXTURES)) { write(join(cwd, 'jevcheck/fixtures/example__no-secret-in-log', name), content); }
     console.log(`Created:\n  ${written.join('\n  ')}\n
 Next:
   1. Export an API key: AI_GATEWAY_API_KEY (Vercel AI Gateway) or TYPESAFE_API_KEY (TypeSafe).
-  2. npx jevlint test    check the example rule against its two fixtures
-  3. npx jevlint         scan this directory`);
+  2. npx jevcheck test    check the example rule against its two fixtures
+  3. npx jevcheck         scan this directory`);
     return 0;
 }
 
-const HANDLERS: Record<string, (args: ParsedArgs, config: ResolvedJevlintConfig) => number | Promise<number>> = {
+const HANDLERS: Record<string, (args: ParsedArgs, config: ResolvedJevcheckConfig) => number | Promise<number>> = {
     scan: runScan,
     test: runTest,
     recall: runRecall,
@@ -509,9 +509,9 @@ const TAKES_POSITIONALS = new Set(['scan', 'baseline', 'verify', 'cache']);
 
 function reportError(err: unknown): number {
     if (err instanceof UsageError) {
-        console.error(`jevlint: ${err.message}\nRun "jevlint${err.command === 'scan' ? '' : ` ${err.command}`} --help" for usage.`);
+        console.error(`jevcheck: ${err.message}\nRun "jevcheck${err.command === 'scan' ? '' : ` ${err.command}`} --help" for usage.`);
     } else {
-        console.error(`jevlint: ${err instanceof Error ? err.message : String(err)}`);
+        console.error(`jevcheck: ${err instanceof Error ? err.message : String(err)}`);
     }
     return 2;
 }

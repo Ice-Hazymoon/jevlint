@@ -1,9 +1,9 @@
 /**
- * AST-level mutation helpers for recall probes (`jevlint recall`). A mutant
+ * AST-level mutation helpers for recall probes (`jevcheck recall`). A mutant
  * must turn real compliant code into a REAL violation and leave the file
  * parseable; a regex that half-deletes a multi-line call produces noise, not
  * a recall probe. Every helper returns null when the file offers nothing to
- * mutate. Exported from the `jevlint/mutate` subpath so rule authors can
+ * mutate. Exported from the `jevcheck/mutate` subpath so rule authors can
  * reuse them instead of hand-rolling AST edits for every rule.
  */
 import ts from 'typescript';

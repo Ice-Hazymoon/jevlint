@@ -5,7 +5,7 @@ export default defineConfig({
         index: 'src/index.ts',
         mutate: 'src/mutate.ts',
         prepare: 'src/prepare.ts',
-        bin: 'bin/jevlint.ts',
+        bin: 'bin/jevcheck.ts',
     },
     format: 'esm',
     platform: 'node',

@@ -7,7 +7,7 @@ import type { JevRule } from './types.js';
  * a rule changes the key.
  *
  * The store is content-addressed and lives outside the project (the
- * configured `cacheDir`, `~/.cache/jevlint` by default), so every checkout
+ * configured `cacheDir`, `~/.cache/jevcheck` by default), so every checkout
  * and every concurrent process shares it, and because entries are immutable
  * files there is no shared mutable state to lock or corrupt.
  */
@@ -31,7 +31,7 @@ export interface StoredVerdict {
 export interface StoredFileResult { verdicts: StoredVerdict[]; skippedWholeFile: boolean }
 
 export function defaultCacheDir(): string {
-    return join(process.env.XDG_CACHE_HOME || join(homedir(), '.cache'), 'jevlint');
+    return join(process.env.XDG_CACHE_HOME || join(homedir(), '.cache'), 'jevcheck');
 }
 
 export function shardedPath(cacheDir: string, kind: 'q' | 'f', hash: string): string {

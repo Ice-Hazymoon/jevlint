@@ -43,11 +43,11 @@ jobs:
                 run: |
                     mkdir "$RUNNER_TEMP/smoke" && cd "$RUNNER_TEMP/smoke"
                     npm init -y > /dev/null
-                    npm install --no-audit --no-fund "$GITHUB_WORKSPACE"/jevlint-*.tgz typescript@^6
-                    npx jevlint --version
-                    npx jevlint init
-                    npx jevlint list
-                    set +e; npx jevlint test; code=$?; set -e
+                    npm install --no-audit --no-fund "$GITHUB_WORKSPACE"/jevcheck-*.tgz typescript@^6
+                    npx jevcheck --version
+                    npx jevcheck init
+                    npx jevcheck list
+                    set +e; npx jevcheck test; code=$?; set -e
                     test "$code" -eq 2 # no API key in CI: a clear error, exit 2
 
     bun:
@@ -65,7 +65,7 @@ jobs:
                 run: |
                     mkdir "$RUNNER_TEMP/smoke" && cd "$RUNNER_TEMP/smoke"
                     echo '{ "name": "smoke", "private": true }' > package.json
-                    bun add "$GITHUB_WORKSPACE"/jevlint-*.tgz typescript@^6
-                    bunx --bun jevlint --version
-                    bunx --bun jevlint init
-                    bunx --bun jevlint list
+                    bun add "$GITHUB_WORKSPACE"/jevcheck-*.tgz typescript@^6
+                    bunx --bun jevcheck --version
+                    bunx --bun jevcheck init
+                    bunx --bun jevcheck list
