@@ -1,9 +1,9 @@
-import type { JevcheckProviderConfig } from './client.js';
-import type { JevcheckReporter } from './reporters.js';
+import type { JevlintProviderConfig } from './client.js';
+import type { JevlintReporter } from './reporters.js';
 import type { JevRule } from './types.js';
 import { createJiti } from 'jiti';
 /**
- * `jevcheck.config.{ts,mts,js,mjs}` loading and validation.
+ * `jevlint.config.{ts,mts,js,mjs}` loading and validation.
  */
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -11,36 +11,36 @@ import { dirname, join, resolve } from 'node:path';
 import { AstGrepRuleError, validateAstGrepRule } from './astGrep.js';
 import { defaultCacheDir } from './ledger.js';
 
-/** The object a `jevcheck.config.ts` default-exports. Only `rules` is required. */
-export interface JevcheckConfig {
+/** The object a `jevlint.config.ts` default-exports. Only `rules` is required. */
+export interface JevlintConfig {
     /** The rules to run. Ids must be unique. */
     rules: readonly JevRule[];
     /** Globs (relative to the config file) of files that may be scanned at all. Default: `DEFAULT_INCLUDE`. */
     include?: readonly string[];
     /** Globs never scanned, whatever `include` or a rule's `files` say. Default: `DEFAULT_IGNORE`. */
     ignore?: readonly string[];
-    /** Fixture directory for `jevcheck test`: `<rule id, "/" → "__">/{invalid,valid,exempt}-*.txt`. Default `jevcheck/fixtures`. */
+    /** Fixture directory for `jevlint test`: `<rule id, "/" → "__">/{invalid,valid,exempt}-*.txt`. Default `jevlint/fixtures`. */
     fixtures?: string;
-    /** File `jevcheck test --record` writes fixture probabilities to. Default `jevcheck/calibration.json`. */
+    /** File `jevlint test --record` writes fixture probabilities to. Default `jevlint/calibration.json`. */
     calibration?: string;
-    /** File `jevcheck baseline` writes accepted hits to. Default `jevcheck/baseline.json`. */
+    /** File `jevlint baseline` writes accepted hits to. Default `jevlint/baseline.json`. */
     baseline?: string;
-    /** Answer and verdict cache. `~` expands to the home directory. Default `$XDG_CACHE_HOME/jevcheck` or `~/.cache/jevcheck`. */
+    /** Answer and verdict cache. `~` expands to the home directory. Default `$XDG_CACHE_HOME/jevlint` or `~/.cache/jevlint`. */
     cacheDir?: string;
-    /** Inline suppression marker: `// <suppression> <rule id> -- <reason>`. Default `jevcheck-ignore`. */
+    /** Inline suppression marker: `// <suppression> <rule id> -- <reason>`. Default `jevlint-ignore`. */
     suppression?: string;
     /** Where answers come from. Default: `gateway` when `AI_GATEWAY_API_KEY` is set, else `typesafe`. */
-    provider?: JevcheckProviderConfig;
+    provider?: JevlintProviderConfig;
     /** Maximum requests in flight. Default 48. */
     concurrency?: number;
     /** Input-token budget per second, estimated. Default 230000. */
     tokensPerSecond?: number;
     /** Called with the full result after every scan, in addition to the CLI's own output. */
-    reporters?: readonly JevcheckReporter[];
+    reporters?: readonly JevlintReporter[];
 }
 
 /** A config with every default filled in and every path absolute. Produced by `loadConfig` / `resolveConfig`. */
-export interface ResolvedJevcheckConfig {
+export interface ResolvedJevlintConfig {
     root: string;
     configPath?: string;
     rules: readonly JevRule[];
@@ -51,10 +51,10 @@ export interface ResolvedJevcheckConfig {
     baseline: string;
     cacheDir: string;
     suppression: string;
-    provider?: JevcheckProviderConfig;
+    provider?: JevlintProviderConfig;
     concurrency?: number;
     tokensPerSecond?: number;
-    reporters: readonly JevcheckReporter[];
+    reporters: readonly JevlintReporter[];
 }
 
 /** Default `include`: TypeScript and Vue single-file components. */
@@ -75,15 +75,15 @@ export const DEFAULT_IGNORE: readonly string[] = [
     '**/*.d.ts',
 ];
 
-const CONFIG_FILE_NAMES = ['jevcheck.config.ts', 'jevcheck.config.mts', 'jevcheck.config.js', 'jevcheck.config.mjs'];
+const CONFIG_FILE_NAMES = ['jevlint.config.ts', 'jevlint.config.mts', 'jevlint.config.js', 'jevlint.config.mjs'];
 const CONFIG_KEYS = ['rules', 'include', 'ignore', 'fixtures', 'calibration', 'baseline', 'cacheDir', 'suppression', 'provider', 'concurrency', 'tokensPerSecond', 'reporters'];
 const RULE_KEYS = ['id', 'source', 'severity', 'status', 'why', 'files', 'exclude', 'prefilter', 'filePrefilter', 'candidates', 'unless', 'wholeFile', 'question', 'criteria', 'exemptions', 'deterministicCandidate', 'prepare', 'mutants', 'threshold', 'confirm', 'fix'];
 
 /** The config is malformed; the message names the field and what was expected. */
-export class JevcheckConfigError extends Error {
+export class JevlintConfigError extends Error {
     constructor(message: string) {
         super(message);
-        this.name = 'JevcheckConfigError';
+        this.name = 'JevlintConfigError';
     }
 }
 
@@ -148,8 +148,8 @@ function ruleProblems(rule: JevRule, index: number): string[] {
     ];
 }
 
-/** Throws one `JevcheckConfigError` listing every unknown key and invalid rule. */
-function validate(config: JevcheckConfig, where: string): void {
+/** Throws one `JevlintConfigError` listing every unknown key and invalid rule. */
+function validate(config: JevlintConfig, where: string): void {
     const problems: string[] = [];
     const unknown = unknownKeys(config, CONFIG_KEYS, where);
     if (unknown) { problems.push(unknown); }
@@ -164,15 +164,15 @@ function validate(config: JevcheckConfig, where: string): void {
     } else {
         problems.push('"rules" must be an array of rules (see defineRule).');
     }
-    if (problems.length > 0) { throw new JevcheckConfigError(problems.join('\n')); }
+    if (problems.length > 0) { throw new JevlintConfigError(problems.join('\n')); }
 }
 
 /**
  * Identity helper that gives a config file type checking and autocomplete. Also rejects unknown
  * keys and invalid rules early; paths are resolved later, by `loadConfig` / `resolveConfig`.
  */
-export function defineConfig(config: JevcheckConfig): JevcheckConfig {
-    validate(config, 'jevcheck config');
+export function defineConfig(config: JevlintConfig): JevlintConfig {
+    validate(config, 'jevlint config');
     return config;
 }
 
@@ -184,14 +184,14 @@ function expandHome(path: string): string {
  * Validates a config object and resolves it against `root` (normally the config file's
  * directory): defaults filled in, every path absolute.
  */
-export function resolveConfig(config: JevcheckConfig, root: string, configPath?: string): ResolvedJevcheckConfig {
-    validate(config, 'jevcheck config');
-    if (config.suppression !== undefined && !/^[\w-]+$/.test(config.suppression)) { throw new JevcheckConfigError(`"suppression" must be a single word of letters, digits, "-" or "_", got "${config.suppression}".`); }
+export function resolveConfig(config: JevlintConfig, root: string, configPath?: string): ResolvedJevlintConfig {
+    validate(config, 'jevlint config');
+    if (config.suppression !== undefined && !/^[\w-]+$/.test(config.suppression)) { throw new JevlintConfigError(`"suppression" must be a single word of letters, digits, "-" or "_", got "${config.suppression}".`); }
     for (const field of ['include', 'ignore'] as const) {
-        if (config[field] !== undefined && !isStringList(config[field])) { throw new JevcheckConfigError(`"${field}" must be an array of glob strings.`); }
+        if (config[field] !== undefined && !isStringList(config[field])) { throw new JevlintConfigError(`"${field}" must be an array of glob strings.`); }
     }
     const provider = config.provider?.kind;
-    if (provider !== undefined && provider !== 'gateway' && provider !== 'typesafe' && provider !== 'replay') { throw new JevcheckConfigError(`"provider.kind" must be "gateway", "typesafe" or "replay", got "${String(provider)}".`); }
+    if (provider !== undefined && provider !== 'gateway' && provider !== 'typesafe' && provider !== 'replay') { throw new JevlintConfigError(`"provider.kind" must be "gateway", "typesafe" or "replay", got "${String(provider)}".`); }
     const path = (value: string | undefined, fallback: string): string => resolve(root, expandHome(value ?? fallback));
     return {
         root,
@@ -199,11 +199,11 @@ export function resolveConfig(config: JevcheckConfig, root: string, configPath?:
         rules: config.rules,
         include: config.include ?? DEFAULT_INCLUDE,
         ignore: config.ignore ?? DEFAULT_IGNORE,
-        fixtures: path(config.fixtures, 'jevcheck/fixtures'),
-        calibration: path(config.calibration, 'jevcheck/calibration.json'),
-        baseline: path(config.baseline, 'jevcheck/baseline.json'),
+        fixtures: path(config.fixtures, 'jevlint/fixtures'),
+        calibration: path(config.calibration, 'jevlint/calibration.json'),
+        baseline: path(config.baseline, 'jevlint/baseline.json'),
         cacheDir: config.cacheDir ? path(config.cacheDir, '') : defaultCacheDir(),
-        suppression: config.suppression ?? 'jevcheck-ignore',
+        suppression: config.suppression ?? 'jevlint-ignore',
         provider: config.provider,
         concurrency: config.concurrency,
         tokensPerSecond: config.tokensPerSecond,
@@ -211,7 +211,7 @@ export function resolveConfig(config: JevcheckConfig, root: string, configPath?:
     };
 }
 
-/** The config file that applies to `startDir`: the nearest `jevcheck.config.*` in it or a parent directory. */
+/** The config file that applies to `startDir`: the nearest `jevlint.config.*` in it or a parent directory. */
 export function findConfigFile(startDir: string): string | undefined {
     for (let dir = resolve(startDir); ; dir = dirname(dir)) {
         const found = CONFIG_FILE_NAMES.map(name => join(dir, name)).find(candidate => existsSync(candidate));
@@ -221,24 +221,24 @@ export function findConfigFile(startDir: string): string | undefined {
 }
 
 /**
- * Loads `configPath` (relative to `cwd`), or the nearest `jevcheck.config.{ts,mts,js,mjs}` found
+ * Loads `configPath` (relative to `cwd`), or the nearest `jevlint.config.{ts,mts,js,mjs}` found
  * by walking up from `cwd`, and resolves it. TypeScript configs are loaded with jiti.
  */
-export async function loadConfig(configPath?: string, cwd: string = process.cwd()): Promise<ResolvedJevcheckConfig> {
+export async function loadConfig(configPath?: string, cwd: string = process.cwd()): Promise<ResolvedJevlintConfig> {
     const path = configPath ? resolve(cwd, configPath) : findConfigFile(cwd);
-    if (!path) { throw new JevcheckConfigError(`No jevcheck.config.{ts,mts,js,mjs} in ${cwd} or any parent directory. Run \`jevcheck init\` to create one, or pass --config <path>.`); }
-    if (!existsSync(path)) { throw new JevcheckConfigError(`Config file not found: ${path}`); }
+    if (!path) { throw new JevlintConfigError(`No jevlint.config.{ts,mts,js,mjs} in ${cwd} or any parent directory. Run \`jevlint init\` to create one, or pass --config <path>.`); }
+    if (!existsSync(path)) { throw new JevlintConfigError(`Config file not found: ${path}`); }
     let loaded: unknown;
     try {
         loaded = await createJiti(import.meta.url, { moduleCache: false }).import(path, { default: true });
     } catch (err: unknown) {
-        if (err instanceof JevcheckConfigError) { throw new JevcheckConfigError(`${path}:\n${err.message}`); }
-        throw new JevcheckConfigError(`Could not load ${path}: ${err instanceof Error ? err.message : String(err)}`);
+        if (err instanceof JevlintConfigError) { throw new JevlintConfigError(`${path}:\n${err.message}`); }
+        throw new JevlintConfigError(`Could not load ${path}: ${err instanceof Error ? err.message : String(err)}`);
     }
-    if (!loaded || typeof loaded !== 'object' || !Array.isArray((loaded as JevcheckConfig).rules)) { throw new JevcheckConfigError(`${path} must default-export a config: \`export default defineConfig({ rules: [...] })\`.`); }
+    if (!loaded || typeof loaded !== 'object' || !Array.isArray((loaded as JevlintConfig).rules)) { throw new JevlintConfigError(`${path} must default-export a config: \`export default defineConfig({ rules: [...] })\`.`); }
     try {
-        return resolveConfig(loaded as JevcheckConfig, dirname(path), path);
+        return resolveConfig(loaded as JevlintConfig, dirname(path), path);
     } catch (err: unknown) {
-        throw err instanceof JevcheckConfigError ? new JevcheckConfigError(`${path}:\n${err.message}`) : err;
+        throw err instanceof JevlintConfigError ? new JevlintConfigError(`${path}:\n${err.message}`) : err;
     }
 }

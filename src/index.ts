@@ -1,14 +1,14 @@
 /**
- * jevcheck: semantic lint rules answered as calibrated yes/no probabilities.
+ * jevlint: semantic lint rules answered as calibrated yes/no probabilities.
  *
- * - `defineConfig` / `defineRule` type a `jevcheck.config.ts`.
- * - `loadConfig` + `createJevcheck` run scans, fixture tests and recall probes from code.
+ * - `defineConfig` / `defineRule` type a `jevlint.config.ts`.
+ * - `loadConfig` + `createJevlint` run scans, fixture tests and recall probes from code.
  *
  * @packageDocumentation
  */
-export { createJevcheck } from './api.js';
+export { createJevlint } from './api.js';
 export type {
-    JevcheckApi,
+    JevlintApi,
     LintOptions,
     RecallMutantResult,
     RecallOptions,
@@ -18,12 +18,12 @@ export type {
     TestResult,
 } from './api.js';
 export { AstGrepRuleError } from './astGrep.js';
-export { JevcheckProviderKeyError, JevcheckReplayMissError, JevcheckRequestError } from './client.js';
-export type { ClientStats, JevcheckProviderConfig } from './client.js';
-export { DEFAULT_IGNORE, DEFAULT_INCLUDE, defineConfig, JevcheckConfigError, loadConfig, resolveConfig } from './config.js';
-export type { JevcheckConfig, ResolvedJevcheckConfig } from './config.js';
+export { JevlintProviderKeyError, JevlintReplayMissError, JevlintRequestError } from './client.js';
+export type { ClientStats, JevlintProviderConfig } from './client.js';
+export { DEFAULT_IGNORE, DEFAULT_INCLUDE, defineConfig, JevlintConfigError, loadConfig, resolveConfig } from './config.js';
+export type { JevlintConfig, ResolvedJevlintConfig } from './config.js';
 export { formatStylish, jsonReporter, stylishReporter } from './reporters.js';
-export type { JevcheckReporter, LintRunResult, ReportedVerdict } from './reporters.js';
+export type { JevlintReporter, LintRunResult, ReportedVerdict } from './reporters.js';
 export { defineRule } from './types.js';
 export type {
     Chunk,

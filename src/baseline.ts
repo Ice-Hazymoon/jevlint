@@ -3,7 +3,7 @@ import type { JevVerdict } from './types.js';
  * Known-hit handling, so a post-edit scan reports what the edit introduced
  * instead of a file's whole backlog.
  *
- *   baseline file   committed fingerprints of accepted backlog hits (`jevcheck baseline`).
+ *   baseline file   committed fingerprints of accepted backlog hits (`jevlint baseline`).
  *                   A fingerprint covers the rule, the file and the normalized text of the
  *                   located range, so edits elsewhere in the file keep it matched, while
  *                   touching the flagged lines makes the hit report again (fail-safe).
@@ -15,8 +15,8 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
 export interface BaselineEntry { rule: string; file: string; fingerprint: string }
 
-/** Default inline-suppression marker name, e.g. `// jevcheck-ignore <id> -- <reason>`. */
-export const DEFAULT_SUPPRESSION_MARKER = 'jevcheck-ignore';
+/** Default inline-suppression marker name, e.g. `// jevlint-ignore <id> -- <reason>`. */
+export const DEFAULT_SUPPRESSION_MARKER = 'jevlint-ignore';
 
 function rangeOf(verdict: JevVerdict): { startLine: number; endLine: number } {
     return verdict.located ?? verdict.chunk;
@@ -30,7 +30,7 @@ export function fingerprint(verdict: JevVerdict, fileLines: readonly string[]): 
 
 /**
  * The rule id, or the short code named at the end of `source` (`"... CODE"`), suppressed by a
- * marker with a reason. `marker` is the suppression name from config (default `jevcheck-ignore`).
+ * marker with a reason. `marker` is the suppression name from config (default `jevlint-ignore`).
  */
 export function inlineSuppressed(verdict: JevVerdict, fileLines: readonly string[], marker: string = DEFAULT_SUPPRESSION_MARKER): boolean {
     const { startLine, endLine } = rangeOf(verdict);

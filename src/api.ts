@@ -1,10 +1,10 @@
 import type { JevClient } from './client.js';
-import type { ResolvedJevcheckConfig } from './config.js';
-import type { JevcheckReporter, LintRunResult, ReportedVerdict } from './reporters.js';
+import type { ResolvedJevlintConfig } from './config.js';
+import type { JevlintReporter, LintRunResult, ReportedVerdict } from './reporters.js';
 import type { JevRule, JevVerdict } from './types.js';
 import type { Claim, ClaimVerdict } from './verify.js';
 /**
- * Programmatic API. The CLI is a thin layer over `createJevcheck`; everything it does is available here.
+ * Programmatic API. The CLI is a thin layer over `createJevlint`; everything it does is available here.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -103,8 +103,8 @@ export interface RecallResult {
     inputTokens: number;
 }
 
-/** What `createJevcheck` returns. File paths are relative to `config.root`. */
-export interface JevcheckApi {
+/** What `createJevlint` returns. File paths are relative to `config.root`. */
+export interface JevlintApi {
     /** Judges `files` with the selected rules and calls the config's reporters with the result. */
     lint: (files: readonly string[], opts?: LintOptions) => Promise<LintRunResult>;
     /** Runs every selected rule against its fixtures. */
@@ -119,7 +119,7 @@ export interface JevcheckApi {
     verify: (claims: readonly Claim[]) => Promise<{ verdicts: readonly ClaimVerdict[]; requests: number; inputTokens: number }>;
     /** Deletes cache entries not used within `maxAgeDays` (default 30). */
     pruneCache: (maxAgeDays?: number) => { removed: number; kept: number };
-    readonly config: ResolvedJevcheckConfig;
+    readonly config: ResolvedJevlintConfig;
 }
 
 function toReported(v: JevVerdict): ReportedVerdict {
@@ -127,7 +127,7 @@ function toReported(v: JevVerdict): ReportedVerdict {
     return { file: v.chunk.file, startLine: range.startLine, endLine: range.endLine, rule: v.rule.id, source: v.rule.source, severity: v.rule.severity, status: v.rule.status, why: v.rule.why, probability: v.probability, fix: v.rule.fix, confirm: v.rule.confirm };
 }
 
-async function runReporters(reporters: readonly JevcheckReporter[], result: LintRunResult): Promise<void> {
+async function runReporters(reporters: readonly JevlintReporter[], result: LintRunResult): Promise<void> {
     for (const reporter of reporters) { await reporter.onRunComplete(result); }
 }
 
@@ -135,10 +135,10 @@ async function runReporters(reporters: readonly JevcheckReporter[], result: Lint
  * Creates an engine for a resolved config (from `loadConfig`, or `resolveConfig` for a config built in code).
  *
  * @example
- * const jevcheck = createJevcheck(await loadConfig());
- * const { hits } = await jevcheck.lint(['src/server.ts']);
+ * const jevlint = createJevlint(await loadConfig());
+ * const { hits } = await jevlint.lint(['src/server.ts']);
  */
-export function createJevcheck(config: ResolvedJevcheckConfig): JevcheckApi {
+export function createJevlint(config: ResolvedJevlintConfig): JevlintApi {
     const readText = (file: string): string => readFileSync(join(config.root, file), 'utf-8');
     const fileLinesCache = new Map<string, string[]>();
     const linesOf = (file: string): string[] => fileLinesCache.get(file) ?? fileLinesCache.set(file, readText(file).split('\n')).get(file)!;

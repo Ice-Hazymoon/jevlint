@@ -1,17 +1,17 @@
 {
-    "name": "jevcheck",
+    "name": "@hazymoon/jevlint",
     "type": "module",
     "version": "0.1.0",
     "description": "Semantic lint rules for the code-review questions a deterministic linter can't express, answered as calibrated yes/no probabilities by TypeSafe's Jev.",
     "author": "Ice-Hazymoon",
     "license": "MIT",
-    "homepage": "https://github.com/Ice-Hazymoon/jevcheck#readme",
+    "homepage": "https://github.com/Ice-Hazymoon/jevlint#readme",
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/Ice-Hazymoon/jevcheck.git"
+        "url": "git+https://github.com/Ice-Hazymoon/jevlint.git"
     },
     "bugs": {
-        "url": "https://github.com/Ice-Hazymoon/jevcheck/issues"
+        "url": "https://github.com/Ice-Hazymoon/jevlint/issues"
     },
     "keywords": [
         "lint",
@@ -42,7 +42,7 @@
     },
     "types": "./dist/index.d.mts",
     "bin": {
-        "jevcheck": "./dist/bin.mjs"
+        "jevlint": "./dist/bin.mjs"
     },
     "files": [
         "CHANGELOG.md",

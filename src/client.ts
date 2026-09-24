@@ -6,7 +6,7 @@ import type { NoulQuestion } from './types.js';
  * Three providers carry the same state + questions contract:
  *   gateway   Vercel AI Gateway's documented TypeSafe-compatible endpoint (`/typesafe/v1/systemone`, same
  *             wire format as TypeSafe). It only serves the moving alias (a pinned version is not served),
- *             so thresholds can move under fixtures — `jevcheck test --drift` compares against the recorded
+ *             so thresholds can move under fixtures — `jevlint test --drift` compares against the recorded
  *             calibration. Its rate limit is reached long before the token limit; the client follows
  *             `retry-after` and the `x-ratelimit-*` headers instead of guessing.
  *   typesafe  api.typesafe.ai directly, pinned to a fixed model version.
@@ -28,7 +28,7 @@ import { shardedPath, writeJsonAtomic } from './ledger.js';
  *
  * When omitted: `gateway` if `AI_GATEWAY_API_KEY` is set, otherwise `typesafe`.
  */
-export type JevcheckProviderConfig
+export type JevlintProviderConfig
     = | { kind: 'gateway'; keyEnv?: string }
         | { kind: 'typesafe'; keyEnv?: string; model?: string }
         | { kind: 'replay'; model?: string };
@@ -41,38 +41,38 @@ const GATEWAY_ENDPOINT = 'https://ai-gateway.vercel.sh/typesafe/v1/systemone';
 const TYPESAFE_ENDPOINT = 'https://api.typesafe.ai/v1/systemone';
 
 /** No API key in the environment variable the provider reads. */
-export class JevcheckProviderKeyError extends Error {
+export class JevlintProviderKeyError extends Error {
     constructor(public readonly keyName: string, configured: boolean) {
         super(configured
-            ? `${keyName} is not set. Export it in the shell or CI job that runs jevcheck (jevcheck never reads .env files), or point provider.keyEnv at the variable you use.`
-            : `No API key found. Set AI_GATEWAY_API_KEY (Vercel AI Gateway) or TYPESAFE_API_KEY (https://typesafe.ai) in the environment, or set \`provider\` in jevcheck.config.ts.`);
-        this.name = 'JevcheckProviderKeyError';
+            ? `${keyName} is not set. Export it in the shell or CI job that runs jevlint (jevlint never reads .env files), or point provider.keyEnv at the variable you use.`
+            : `No API key found. Set AI_GATEWAY_API_KEY (Vercel AI Gateway) or TYPESAFE_API_KEY (https://typesafe.ai) in the environment, or set \`provider\` in jevlint.config.ts.`);
+        this.name = 'JevlintProviderKeyError';
     }
 }
 
 /** The replay provider was asked a question that has no cached answer. */
-export class JevcheckReplayMissError extends Error {
+export class JevlintReplayMissError extends Error {
     constructor(public readonly ids: readonly string[], cacheDir: string, model: string) {
         super(`replay: no cached answer for ${ids.length} question(s) (${ids.slice(0, 3).join(', ')}${ids.length > 3 ? ', …' : ''}) under model "${model}" in ${cacheDir}. Replay only returns answers a live provider already gave for the same rule, code and model: run once with a live provider and the same cacheDir, or check provider.model.`);
-        this.name = 'JevcheckReplayMissError';
+        this.name = 'JevlintReplayMissError';
     }
 }
 
 /** A request to the provider failed for a reason retrying did not fix. */
-export class JevcheckRequestError extends Error {
+export class JevlintRequestError extends Error {
     constructor(message: string, public readonly status?: number) {
         super(message);
-        this.name = 'JevcheckRequestError';
+        this.name = 'JevlintRequestError';
     }
 }
 
 /** Resolves a provider config (env reads only — no dotenv, no file reads) into endpoint + key. */
-export function resolveProvider(config: JevcheckProviderConfig | undefined, env: NodeJS.ProcessEnv = process.env): ResolvedProvider {
+export function resolveProvider(config: JevlintProviderConfig | undefined, env: NodeJS.ProcessEnv = process.env): ResolvedProvider {
     const provider = config ?? (env.AI_GATEWAY_API_KEY ? { kind: 'gateway' as const } : { kind: 'typesafe' as const });
     if (provider.kind === 'replay') { return { name: 'replay', model: provider.model ?? DEFAULT_GATEWAY_MODEL }; }
     const keyName = provider.keyEnv ?? (provider.kind === 'gateway' ? 'AI_GATEWAY_API_KEY' : 'TYPESAFE_API_KEY');
     const apiKey = env[keyName]?.trim();
-    if (!apiKey) { throw new JevcheckProviderKeyError(keyName, config !== undefined); }
+    if (!apiKey) { throw new JevlintProviderKeyError(keyName, config !== undefined); }
     return provider.kind === 'gateway'
         ? { name: 'gateway', model: DEFAULT_GATEWAY_MODEL, endpoint: GATEWAY_ENDPOINT, keyName, apiKey }
         : { name: 'typesafe', model: provider.model ?? DEFAULT_TYPESAFE_MODEL, endpoint: TYPESAFE_ENDPOINT, keyName, apiKey };
@@ -150,10 +150,10 @@ function createLimiter(max: number): <T>(task: () => Promise<T>) => Promise<T> {
 interface WireAnswer { type: string; noul?: number; probability?: number; choice?: string; confidence?: number; probabilities?: Record<string, number> }
 interface WireResponse { answers?: Record<string, WireAnswer>; usage?: { input_tokens?: number; inputTokens?: number } }
 
-export interface JevcheckClientOptions {
+export interface JevlintClientOptions {
     cacheDir: string;
     useCache: boolean;
-    provider: JevcheckProviderConfig | undefined;
+    provider: JevlintProviderConfig | undefined;
     concurrency?: number;
     tokensPerSecond?: number;
     env?: NodeJS.ProcessEnv;
@@ -195,7 +195,7 @@ function statusMessage(provider: ResolvedProvider, status: number, attempts: num
     return `${provider.name} answered HTTP ${status}${body ? `: ${body}` : ''}`;
 }
 
-export function createJevClient(options: JevcheckClientOptions): JevClient {
+export function createJevClient(options: JevlintClientOptions): JevClient {
     const provider = resolveProvider(options.provider, options.env ?? process.env);
     const headers: Record<string, string> = provider.apiKey ? { 'Authorization': `Bearer ${provider.apiKey}`, 'Content-Type': 'application/json' } : {};
     // One gate for every in-flight request: a 429's `retry-after`, or an exhausted request window reported by
@@ -238,20 +238,20 @@ export function createJevClient(options: JevcheckClientOptions): JevClient {
                 await backoff(attempt);
                 return undefined;
             }
-            throw new JevcheckRequestError(`Could not reach ${provider.name} (${new URL(provider.endpoint!).host}) after ${attempt} attempts: ${describeNetworkError(err)}.`);
+            throw new JevlintRequestError(`Could not reach ${provider.name} (${new URL(provider.endpoint!).host}) after ${attempt} attempts: ${describeNetworkError(err)}.`);
         }
         const retryable = response.status === 429 || response.status === 529 || response.status >= 500;
         if (retryable && attempt < MAX_ATTEMPTS) {
             await waitBeforeRetry(response, attempt);
             return undefined;
         }
-        if (!response.ok) { throw new JevcheckRequestError(statusMessage(provider, response.status, attempt, (await response.text()).slice(0, 300)), response.status); }
+        if (!response.ok) { throw new JevlintRequestError(statusMessage(provider, response.status, attempt, (await response.text()).slice(0, 300)), response.status); }
         observeRateLimit(response);
         return await response.json() as WireResponse;
     }
 
     async function postRaw(stateJson: string, questions: Record<string, NoulQuestion | ChoiceQuestion>): Promise<WireResponse> {
-        if (provider.name === 'replay') { throw new JevcheckReplayMissError(Object.keys(questions), options.cacheDir, provider.model); }
+        if (provider.name === 'replay') { throw new JevlintReplayMissError(Object.keys(questions), options.cacheDir, provider.model); }
         const body = `{"model":${JSON.stringify(provider.name === 'gateway' ? 'jev-latest' : provider.model)},"state":${stateJson},"questions":${JSON.stringify(questions)}}`;
         const estimated = estimateTokens(body);
         for (let attempt = 1; ; attempt++) {

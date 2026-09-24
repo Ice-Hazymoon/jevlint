@@ -1,6 +1,6 @@
 import type { RecallMutantResult, RecallOptions, RecallResult, TestCaseResult, TestOptions, TestResult } from './api.js';
 import type { JevClient } from './client.js';
-import type { ResolvedJevcheckConfig } from './config.js';
+import type { ResolvedJevlintConfig } from './config.js';
 import type { Chunk, JevMutant, JevRule, JevVerdict } from './types.js';
 /**
  * Rule quality checks: fixtures (`test`) prove a question can work; mutation recall (`recall`) proves it
@@ -54,7 +54,7 @@ async function judgeFixture(client: JevClient, cacheDir: string, rule: JevRule, 
     return scoreFixture(key, kind, rule.threshold ?? DEFAULT_THRESHOLD, strongest(verdicts));
 }
 
-function recordOrCompare(config: ResolvedJevcheckConfig, client: JevClient, cases: readonly TestCaseResult[], opts: TestOptions): Pick<TestResult, 'drift' | 'recorded'> {
+function recordOrCompare(config: ResolvedJevlintConfig, client: JevClient, cases: readonly TestCaseResult[], opts: TestOptions): Pick<TestResult, 'drift' | 'recorded'> {
     const answered = cases.filter((c): c is TestCaseResult & { probability: number } => c.probability !== undefined);
     if (opts.record) {
         const merged = mergeCalibration(config.calibration, client.provider.model, client.provider.name, Object.fromEntries(answered.map(c => [c.key, Number(c.probability.toFixed(3))])));
@@ -70,7 +70,7 @@ function recordOrCompare(config: ResolvedJevcheckConfig, client: JevClient, case
 }
 
 /** Runs every selected rule against `<fixtures>/<rule id, "/" as "__">/{invalid,valid,exempt}-*`. */
-export async function runFixtures(config: ResolvedJevcheckConfig, client: JevClient, opts: TestOptions): Promise<TestResult> {
+export async function runFixtures(config: ResolvedJevlintConfig, client: JevClient, opts: TestOptions): Promise<TestResult> {
     const missing: string[] = [];
     let neverAsked = 0;
     const tasks: Array<Promise<TestCaseResult>> = [];
@@ -105,7 +105,7 @@ export async function runFixtures(config: ResolvedJevcheckConfig, client: JevCli
 }
 
 /** Up to `limit` real files the mutant changes, in a stable pseudo-random order per rule (so samples spread across directories). */
-function mutableFiles(config: ResolvedJevcheckConfig, rule: JevRule, mutant: JevMutant, files: readonly string[], limit: number): Array<{ file: string; text: string }> {
+function mutableFiles(config: ResolvedJevlintConfig, rule: JevRule, mutant: JevMutant, files: readonly string[], limit: number): Array<{ file: string; text: string }> {
     const order = (file: string): string => createHash('sha1').update(rule.id).update(file).digest('hex');
     const tokenLimit = rule.wholeFile ? WHOLE_FILE_TOKEN_LIMIT : WHOLE_FILE_TOKEN_LIMIT * 2;
     const found: Array<{ file: string; text: string }> = [];
@@ -130,7 +130,7 @@ async function judgeMutant(client: JevClient, cacheDir: string, rule: JevRule, f
     return { outcome: 'missed', note: `${file} (${verdicts.length === 0 ? 'not asked: prefilter / no candidate' : `p=${best.toFixed(2)}`})` };
 }
 
-async function measureMutant(config: ResolvedJevcheckConfig, client: JevClient, rule: JevRule, mutant: JevMutant, opts: RecallOptions): Promise<RecallMutantResult> {
+async function measureMutant(config: ResolvedJevlintConfig, client: JevClient, rule: JevRule, mutant: JevMutant, opts: RecallOptions): Promise<RecallMutantResult> {
     const sampleSize = opts.sampleSize ?? 12;
     const candidates = mutableFiles(config, rule, mutant, opts.files, sampleSize * 3);
     const sample = candidates.slice(0, sampleSize);
@@ -149,7 +149,7 @@ async function measureMutant(config: ResolvedJevcheckConfig, client: JevClient, 
 }
 
 /** Injects each selected rule's mutants into real files and measures the share of violations caught. */
-export async function runRecall(config: ResolvedJevcheckConfig, client: JevClient, opts: RecallOptions): Promise<RecallResult> {
+export async function runRecall(config: ResolvedJevlintConfig, client: JevClient, opts: RecallOptions): Promise<RecallResult> {
     const tracked = opts.files.filter(file => matchesGlobs(config.include, file) && !matchesGlobs(config.ignore, file));
     const mutants: RecallMutantResult[] = [];
     for (const rule of selectRules(config.rules, { ids: opts.rules })) {

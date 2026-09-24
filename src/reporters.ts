@@ -44,7 +44,7 @@ export interface LintRunResult {
 }
 
 /** Receives the result of every scan. Add reporters in the config's `reporters` array. */
-export interface JevcheckReporter {
+export interface JevlintReporter {
     name: string;
     onRunComplete: (result: LintRunResult) => void | Promise<void>;
 }
@@ -115,7 +115,7 @@ export function formatStylish(result: LintRunResult, options: { showExempted?: b
 }
 
 /** Human-readable report on stdout (the CLI default). */
-export const stylishReporter: JevcheckReporter = {
+export const stylishReporter: JevlintReporter = {
     name: 'stylish',
     onRunComplete(result) {
         console.log(formatStylish(result));
@@ -123,7 +123,7 @@ export const stylishReporter: JevcheckReporter = {
 };
 
 /** The whole `LintRunResult` as one JSON document on stdout. */
-export const jsonReporter: JevcheckReporter = {
+export const jsonReporter: JevlintReporter = {
     name: 'json',
     onRunComplete(result) {
         console.log(JSON.stringify(result, null, 2));

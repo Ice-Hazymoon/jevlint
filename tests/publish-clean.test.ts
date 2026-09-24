@@ -3,7 +3,7 @@
  * `npm pack` file list may carry a credential, and the tarball may only contain what users need.
  *
  * Maintainers can add their own forbidden terms without committing them: point
- * JEVCHECK_FORBIDDEN_TERMS at a file with one case-insensitive regular expression per line.
+ * JEVLINT_FORBIDDEN_TERMS at a file with one case-insensitive regular expression per line.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -22,8 +22,8 @@ const SECRET_PATTERNS: readonly RegExp[] = [
     /Bearer [A-Za-z0-9]/,
 ];
 
-const extraTerms: readonly RegExp[] = process.env.JEVCHECK_FORBIDDEN_TERMS
-    ? readFileSync(process.env.JEVCHECK_FORBIDDEN_TERMS, 'utf-8').split('\n').map(line => line.trim()).filter(Boolean).map(line => new RegExp(line, 'i'))
+const extraTerms: readonly RegExp[] = process.env.JEVLINT_FORBIDDEN_TERMS
+    ? readFileSync(process.env.JEVLINT_FORBIDDEN_TERMS, 'utf-8').split('\n').map(line => line.trim()).filter(Boolean).map(line => new RegExp(line, 'i'))
     : [];
 
 function listFiles(dir: string, out: string[] = []): string[] {

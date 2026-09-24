@@ -53,7 +53,7 @@ describe('cache read/write/prune', () => {
     let cacheDir: string;
 
     beforeEach(() => {
-        cacheDir = mkdtempSync(join(tmpdir(), 'jevcheck-ledger-test-'));
+        cacheDir = mkdtempSync(join(tmpdir(), 'jevlint-ledger-test-'));
     });
     afterEach(() => rmSync(cacheDir, { recursive: true, force: true }));
 

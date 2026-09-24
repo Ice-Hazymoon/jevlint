@@ -4,7 +4,7 @@
  * remove it instead of asking Jev to reason around it — "every X is only
  * inside Y" is a universal, negation-heavy judgment models answer poorly,
  * and one AST pass answers exactly. Line count is preserved so reported
- * ranges stay true. Exported from the `jevcheck/prepare` subpath.
+ * ranges stay true. Exported from the `@hazymoon/jevlint/prepare` subpath.
  */
 import ts from 'typescript';
 

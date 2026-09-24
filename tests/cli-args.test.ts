@@ -13,7 +13,7 @@ describe('parseArgs', () => {
     it('takes an option value as "--name=value" or "--name value", keeping any "=" after the first', () => {
         expect(parseArgs(['--base', 'origin/main']).values.get('base')).toBe('origin/main');
         expect(parseArgs(['--base=feature/x=y']).values.get('base')).toBe('feature/x=y');
-        expect(parseArgs(['test', '--config', 'cfg/jevcheck.config.ts']).values.get('config')).toBe('cfg/jevcheck.config.ts');
+        expect(parseArgs(['test', '--config', 'cfg/jevlint.config.ts']).values.get('config')).toBe('cfg/jevlint.config.ts');
     });
 
     it('recognizes a command only in first position', () => {

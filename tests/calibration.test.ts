@@ -9,7 +9,7 @@ describe('mergeCalibration', () => {
     let path: string;
 
     beforeEach(() => {
-        dir = mkdtempSync(join(tmpdir(), 'jevcheck-calibration-test-'));
+        dir = mkdtempSync(join(tmpdir(), 'jevlint-calibration-test-'));
         path = join(dir, 'calibration.json');
     });
     afterEach(() => rmSync(dir, { recursive: true, force: true }));

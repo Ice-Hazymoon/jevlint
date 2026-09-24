@@ -39,9 +39,9 @@ describe('fingerprint', () => {
 
 describe('inlineSuppressed', () => {
     it('matches by rule id or by the short code from `source`, with a reason', () => {
-        const withId = ['// jevcheck-ignore demo/no-console-log -- intentional debug output', 'console.log(1);'];
-        const withCode = ['// jevcheck-ignore DR1 -- intentional debug output', 'console.log(1);'];
-        const noReason = ['// jevcheck-ignore demo/no-console-log', 'console.log(1);'];
+        const withId = ['// jevlint-ignore demo/no-console-log -- intentional debug output', 'console.log(1);'];
+        const withCode = ['// jevlint-ignore DR1 -- intentional debug output', 'console.log(1);'];
+        const noReason = ['// jevlint-ignore demo/no-console-log', 'console.log(1);'];
         const noMarker = ['console.log(1);'];
         expect(inlineSuppressed(verdictFor(withId, 2, 2), withId)).toBe(true);
         expect(inlineSuppressed(verdictFor(withCode, 2, 2), withCode)).toBe(true);
@@ -52,7 +52,7 @@ describe('inlineSuppressed', () => {
     it('honours a configured marker name', () => {
         const lines = ['// custom-ignore demo/no-console-log -- reason', 'console.log(1);'];
         expect(inlineSuppressed(verdictFor(lines, 2, 2), lines, 'custom-ignore')).toBe(true);
-        expect(inlineSuppressed(verdictFor(lines, 2, 2), lines, 'jevcheck-ignore')).toBe(false);
+        expect(inlineSuppressed(verdictFor(lines, 2, 2), lines, 'jevlint-ignore')).toBe(false);
     });
 });
 
@@ -61,7 +61,7 @@ describe('readBaseline / writeBaseline', () => {
     let path: string;
 
     beforeEach(() => {
-        dir = mkdtempSync(join(tmpdir(), 'jevcheck-baseline-test-'));
+        dir = mkdtempSync(join(tmpdir(), 'jevlint-baseline-test-'));
         path = join(dir, 'baseline.json');
     });
     afterEach(() => rmSync(dir, { recursive: true, force: true }));
