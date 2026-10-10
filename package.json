@@ -1,7 +1,7 @@
 {
     "name": "@hazymoon/jevlint",
     "type": "module",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "Semantic lint rules for the code-review questions a deterministic linter can't express, answered as calibrated yes/no probabilities by TypeSafe's Jev.",
     "author": "Ice-Hazymoon",
     "license": "MIT",

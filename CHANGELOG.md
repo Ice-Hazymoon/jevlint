@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.1
 
 - Plain-text and JSON files are judged in bounded line chunks instead of one oversized request. Whole-file rules still skip oversized files.
 - Token estimates count UTF-8 bytes, so CJK text is no longer underestimated.
