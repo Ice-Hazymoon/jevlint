@@ -193,6 +193,12 @@ For a config built in code, use `resolveConfig(defineConfig({ ... }), rootDir)`.
   security/bounded-query  drop-limit  9/10  recall=0.90
   ```
 
+## Oversized input
+
+Plain-text and JSON files with no declarations to split on are judged in bounded line chunks that keep every line and its original line numbers. Whole-file rules still skip an oversized file and report it, because splitting would change their question.
+
+Token estimates count UTF-8 bytes, so CJK text is not costed like ASCII prose. Before sending, the client checks that the shared state plus each question fits the per-question limit and that the whole request fits the request limit; a batch counts its state once. A single line or question too large to fit fails with its file and question IDs, nothing is sent, and it is never reported as judged. The chunking change also invalidates the file ledger, so answers recorded for an unsplit file cannot mask a rescan.
+
 ## FAQ
 
 **What does it cost?** One request carries every applicable question for one chunk of code. Two stores keep re-scans cheap: a file unchanged since its last scan is replayed whole from the ledger, for free; a changed file still reuses any individual answer already in the per-question cache. `prefilter` / `candidates` keep unrelated code from being sent at all. The summary line reports both, plus requests and input tokens, for example `3 files replayed from ledger, 12 answers from cache, 2 requests, 480 input tokens`.

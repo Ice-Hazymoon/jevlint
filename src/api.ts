@@ -140,8 +140,6 @@ async function runReporters(reporters: readonly JevlintReporter[], result: LintR
  */
 export function createJevlint(config: ResolvedJevlintConfig): JevlintApi {
     const readText = (file: string): string => readFileSync(join(config.root, file), 'utf-8');
-    const fileLinesCache = new Map<string, string[]>();
-    const linesOf = (file: string): string[] => fileLinesCache.get(file) ?? fileLinesCache.set(file, readText(file).split('\n')).get(file)!;
 
     function client(useCache: boolean): JevClient {
         return createJevClient({ cacheDir: config.cacheDir, useCache, provider: config.provider, concurrency: config.concurrency, tokensPerSecond: config.tokensPerSecond });
@@ -151,12 +149,16 @@ export function createJevlint(config: ResolvedJevlintConfig): JevlintApi {
         return files.filter(file => matchesGlobs(config.include, file) && !matchesGlobs(config.ignore, file));
     }
 
-    async function lint(files: readonly string[], opts: LintOptions = {}): Promise<LintRunResult> {
+    async function scan(files: readonly string[], opts: LintOptions = {}) {
         const selected = selectRules(config.rules, { ids: opts.rules, owned: opts.owned });
         const scanned = inScope(files);
         const jevClient = client(!opts.noCache);
         const candidateMaps = buildCandidateMaps(config.root, selected, scanned);
-        const results = await Promise.all(scanned.map(file => judgeFile(file, readText(file), selected, {
+        const sourceSnapshots = new Map(scanned.map((file) => {
+            const text = readText(file);
+            return [file, { text, lines: text.split('\n') }] as const;
+        }));
+        const results = await Promise.all(scanned.map(file => judgeFile(file, sourceSnapshots.get(file)!.text, selected, {
             client: jevClient,
             model: jevClient.provider.model,
             cacheDir: config.cacheDir,
@@ -174,8 +176,8 @@ export function createJevlint(config: ResolvedJevlintConfig): JevlintApi {
         const exempted = fired.filter(v => exemptedBy(v));
         const useBaseline = opts.useBaseline ?? true;
         const known = new Set(useBaseline ? readBaseline(config.baseline).map(entry => `${entry.rule}\0${entry.file}\0${entry.fingerprint}`) : []);
-        const suppressed = unexempted.filter(v => inlineSuppressed(v, linesOf(v.chunk.file), config.suppression));
-        const baselined = unexempted.filter(v => !suppressed.includes(v) && known.has(`${v.rule.id}\0${v.chunk.file}\0${fingerprint(v, linesOf(v.chunk.file))}`));
+        const suppressed = unexempted.filter(v => inlineSuppressed(v, sourceSnapshots.get(v.chunk.file)!.lines, config.suppression));
+        const baselined = unexempted.filter(v => !suppressed.includes(v) && known.has(`${v.rule.id}\0${v.chunk.file}\0${fingerprint(v, sourceSnapshots.get(v.chunk.file)!.lines)}`));
         const hits = unexempted.filter(v => !suppressed.includes(v) && !baselined.includes(v));
         const review = opts.review ? verdicts.filter(v => v.probability >= REVIEW_FLOOR && !fired.includes(v)) : [];
         const result: LintRunResult = {
@@ -193,13 +195,17 @@ export function createJevlint(config: ResolvedJevlintConfig): JevlintApi {
             stats: jevClient.stats,
         };
         await runReporters(config.reporters, result);
-        return result;
+        return { result, sourceSnapshots };
+    }
+
+    async function lint(files: readonly string[], opts: LintOptions = {}): Promise<LintRunResult> {
+        return (await scan(files, opts)).result;
     }
 
     async function baseline(files: readonly string[], opts: Pick<LintOptions, 'rules' | 'owned'> = {}): Promise<{ hitsWritten: number; totalEntries: number }> {
-        const result = await lint(files, { ...opts, useBaseline: false });
+        const { result, sourceSnapshots } = await scan(files, { ...opts, useBaseline: false });
         const selected = selectRules(config.rules, { ids: opts.rules, owned: opts.owned });
-        const total = writeBaseline(config.baseline, new Set(inScope(files)), new Set(selected.map(rule => rule.id)), result.hits.map(hit => ({ rule: hit.rule, file: hit.file, fingerprint: fingerprint({ rule: selected.find(r => r.id === hit.rule)!, chunk: { file: hit.file, startLine: hit.startLine, endLine: hit.endLine, text: '' }, probability: hit.probability, exemptions: {} }, linesOf(hit.file)) })));
+        const total = writeBaseline(config.baseline, new Set(inScope(files)), new Set(selected.map(rule => rule.id)), result.hits.map(hit => ({ rule: hit.rule, file: hit.file, fingerprint: fingerprint({ rule: selected.find(r => r.id === hit.rule)!, chunk: { file: hit.file, startLine: hit.startLine, endLine: hit.endLine, text: '' }, probability: hit.probability, exemptions: {} }, sourceSnapshots.get(hit.file)!.lines) })));
         return { hitsWritten: result.hits.length, totalEntries: total };
     }
 

@@ -17,7 +17,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 /** Bump when chunking, window pass or verdict composition changes meaning. */
-export const ENGINE_VERSION = '5';
+export const ENGINE_VERSION = '7';
 
 export interface StoredVerdict {
     rule: string;

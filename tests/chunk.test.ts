@@ -17,6 +17,17 @@ describe('chunkFile', () => {
         for (const chunk of chunks) { expect(chunk.text).toContain('import { readFileSync } from \'node:fs\';'); }
     });
 
+    it('keeps every locale line in bounded chunks instead of sending the catalog whole', () => {
+        const lines = Array.from({ length: 2600 }, (_, i) => `    "key${i}": "Check your details and try again."`);
+        const text = lines.join('\n');
+        const chunks = chunkFile('i18n/locales/en.json', text);
+        expect(chunks.length).toBeGreaterThan(1);
+        expect(chunks.every(chunk => chunk.text.length < 72000)).toBe(true);
+        expect(chunks.map(chunk => chunk.text).join('\n')).toBe(text);
+        expect(chunks[0]?.startLine).toBe(1);
+        expect(chunks.at(-1)?.endLine).toBe(lines.length);
+    });
+
     it('splits a large .vue file into <script> and <template> spans', () => {
         const script = Array.from({ length: 200 }, (_, i) => `// line ${i}`).join('\n');
         const text = `<script setup lang="ts">\n${script}\n</script>\n<template>\n  <div />\n</template>\n`;

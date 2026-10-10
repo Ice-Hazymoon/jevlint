@@ -14,6 +14,7 @@ import type { NoulQuestion } from './types.js';
  *             For CI and this package's own tests.
  * The model label is part of every cache and ledger key, so different providers never share answers.
  */
+import { Buffer } from 'node:buffer';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { shardedPath, writeJsonAtomic } from './ledger.js';
@@ -80,6 +81,8 @@ export function resolveProvider(config: JevlintProviderConfig | undefined, env: 
 
 // Hard limits are 64k per request and 32k for state + longest question; stay well inside both.
 const REQUEST_TOKEN_BUDGET = 40_000;
+const STATE_QUESTION_TOKEN_BUDGET = 30_000;
+const REQUEST_TOKEN_LIMIT = 60_000;
 const DEFAULT_CONCURRENCY = 48;
 const DEFAULT_TOKENS_PER_SECOND = 230_000;
 const MAX_ATTEMPTS = 8;
@@ -99,9 +102,9 @@ export interface JevClient {
     provider: { name: ResolvedProvider['name']; model: string };
 }
 
-/** Rough token estimate; code tokenizes denser than prose, so err on the high side. */
+/** Estimate UTF-8 bytes rather than characters so CJK text is not costed like ASCII prose. */
 export function estimateTokens(text: string): number {
-    return Math.ceil(text.length / 3);
+    return Math.ceil(Buffer.byteLength(text, 'utf8') / 3);
 }
 
 /** The per-question disk-cache key: `hash(model, state, question)`. Exported so a test (or a tool that pre-seeds the replay cache) can compute the same path `ask`/`choose` will look up, without duplicating the hash formula. */
@@ -170,7 +173,7 @@ function describeNetworkError(err: unknown): string {
     return err instanceof Error ? err.message : String(err);
 }
 
-/** Packs questions into requests that stay under the per-request token budget, state included in each. */
+/** Each request shares one state across its questions; include that state once per batch. */
 function batchByBudget(stateTokens: number, questions: ReadonlyArray<[string, NoulQuestion]>): Array<Record<string, NoulQuestion>> {
     const batches: Array<Record<string, NoulQuestion>> = [];
     let current: Record<string, NoulQuestion> = {};
@@ -187,6 +190,18 @@ function batchByBudget(stateTokens: number, questions: ReadonlyArray<[string, No
     }
     if (Object.keys(current).length > 0) { batches.push(current); }
     return batches;
+}
+
+// Chunking cannot split a single long line or question safely; fail explicitly instead of sending it.
+function assertRequestBudget(stateJson: string, questions: Record<string, NoulQuestion | ChoiceQuestion>, bodyTokens: number): void {
+    const stateTokens = estimateTokens(stateJson);
+    const requestTokens = Math.max(bodyTokens, Object.values(questions).reduce((sum, question) => sum + estimateTokens(JSON.stringify(question)), stateTokens));
+    const oversized = Object.entries(questions).filter(([, question]) => stateTokens + estimateTokens(JSON.stringify(question)) > STATE_QUESTION_TOKEN_BUDGET);
+    if (oversized.length === 0 && requestTokens <= REQUEST_TOKEN_LIMIT) { return; }
+    const state: unknown = JSON.parse(stateJson);
+    const file = state && typeof state === 'object' && 'file' in state && typeof state.file === 'string' ? state.file : '<state>';
+    const ids = (oversized.length ? oversized.map(([id]) => id) : Object.keys(questions)).join(', ');
+    throw new JevlintRequestError(`${file}: ${ids}: token budget exceeded (state=${stateTokens}, request=${requestTokens}); split the chunk or question. Nothing was sent or judged.`);
 }
 
 function statusMessage(provider: ResolvedProvider, status: number, attempts: number, body: string): string {
@@ -254,6 +269,7 @@ export function createJevClient(options: JevlintClientOptions): JevClient {
         if (provider.name === 'replay') { throw new JevlintReplayMissError(Object.keys(questions), options.cacheDir, provider.model); }
         const body = `{"model":${JSON.stringify(provider.name === 'gateway' ? 'jev-latest' : provider.model)},"state":${stateJson},"questions":${JSON.stringify(questions)}}`;
         const estimated = estimateTokens(body);
+        assertRequestBudget(stateJson, questions, estimated);
         for (let attempt = 1; ; attempt++) {
             await pacer.wait(estimated);
             await waitForGate();

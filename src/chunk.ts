@@ -94,7 +94,13 @@ export function chunkFile(file: string, text: string): Chunk[] {
         const spans = vueSpans(lines);
         return spans.length === 0 ? [whole] : spans.flatMap(span => chunkVueSpan(file, lines, span));
     }
-    return (/\.[cm]?tsx?$/.test(file) ? chunkTypeScript(file, text, lines) : undefined) ?? [whole];
+    const declarations = /\.[cm]?tsx?$/.test(file) ? chunkTypeScript(file, text, lines) : undefined;
+    if (declarations) { return declarations; }
+    // Locale JSON and other plain text have no declarations; retain every line in bounded windows.
+    return Array.from({ length: Math.ceil(lines.length / CHUNK_TARGET_LINES) }, (_, index) => {
+        const span = { startLine: index * CHUNK_TARGET_LINES + 1, endLine: Math.min((index + 1) * CHUNK_TARGET_LINES, lines.length) };
+        return { file, ...span, text: sliceLines(lines, span) };
+    });
 }
 
 /** Overlapping line windows over a chunk's own range, for the localization pass. */

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Plain-text and JSON files are judged in bounded line chunks instead of one oversized request. Whole-file rules still skip oversized files.
+- Token estimates count UTF-8 bytes, so CJK text is no longer underestimated.
+- Requests are checked against the per-question and per-request limits before sending; an oversized line or question fails with its file and question IDs instead of being sent. A batch counts its shared state once.
+- `lint` and `baseline` read each file once per scan, so suppressions and baseline fingerprints use the same snapshot that was judged.
+- Ledger engine version is now 7: answers recorded by earlier versions are re-judged.
+
 ## 0.1.0
 
 First release.
