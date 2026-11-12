@@ -204,6 +204,29 @@ function assertRequestBudget(stateJson: string, questions: Record<string, NoulQu
     throw new JevlintRequestError(`${file}: ${ids}: token budget exceeded (state=${stateTokens}, request=${requestTokens}); split the chunk or question. Nothing was sent or judged.`);
 }
 
+/** Longest pause one server hint may impose, in seconds. */
+const MAX_HOLD_SECONDS = 90;
+
+/**
+ * Retry-After per RFC 9110 section 10.2.3: delay-seconds (digits only) or an HTTP-date.
+ * Returns seconds to wait, or undefined for a missing, malformed, negative or already-past value.
+ */
+export function parseRetryAfter(value: string | null, now: number = Date.now()): number | undefined {
+    const text = value?.trim();
+    if (!text) { return undefined; }
+    if (/^\d+$/.test(text)) {
+        const seconds = Number(text);
+        return seconds > 0 ? seconds : undefined;
+    }
+    // Date.parse accepts far more than RFC 9110's formats; every HTTP-date form starts with a weekday name.
+    if (!/^[a-z]{3}/i.test(text)) { return undefined; }
+    // asctime-date (`Sun Nov  6 08:49:37 1994`) carries no zone and is GMT by definition; Date.parse would read it as local time.
+    const at = Date.parse(/\d{4}$/.test(text) ? `${text} GMT` : text);
+    if (Number.isNaN(at)) { return undefined; }
+    const seconds = (at - now) / 1000;
+    return seconds > 0 ? seconds : undefined;
+}
+
 function statusMessage(provider: ResolvedProvider, status: number, attempts: number, body: string): string {
     if (status === 401 || status === 403) { return `${provider.name} rejected the API key in ${provider.keyName} (HTTP ${status}).`; }
     if (status === 429 || status === 529) { return `${provider.name} is still rate limiting after ${attempts} attempts (HTTP ${status}). Lower \`concurrency\` / \`tokensPerSecond\` in the config, or try again later.`; }
@@ -217,7 +240,7 @@ export function createJevClient(options: JevlintClientOptions): JevClient {
     // the rate-limit headers, holds all of them back instead of letting every socket retry into the same wall.
     let blockedUntil = 0;
     const holdFor = (seconds: number): void => {
-        blockedUntil = Math.max(blockedUntil, Date.now() + Math.min(seconds, 90) * 1000);
+        blockedUntil = Math.max(blockedUntil, Date.now() + Math.min(seconds, MAX_HOLD_SECONDS) * 1000);
     };
     const limit = createLimiter(options.concurrency ?? DEFAULT_CONCURRENCY);
     const pacer = createTokenPacer(options.tokensPerSecond ?? DEFAULT_TOKENS_PER_SECOND);
@@ -231,9 +254,9 @@ export function createJevClient(options: JevlintClientOptions): JevClient {
 
     async function waitBeforeRetry(response: Response, attempt: number): Promise<void> {
         if (response.status === 429 || response.status === 529) { stats.throttled++; }
-        const retryAfter = Number(response.headers.get('retry-after'));
+        const retryAfter = parseRetryAfter(response.headers.get('retry-after'));
         // Jitter keeps a burst of throttled requests from returning in lockstep.
-        if (Number.isFinite(retryAfter) && retryAfter > 0) { holdFor(retryAfter); } else { await backoff(attempt); }
+        if (retryAfter !== undefined) { holdFor(retryAfter); } else { await backoff(attempt); }
     }
 
     /** Window nearly spent: wait for its reset rather than collecting 429s. */

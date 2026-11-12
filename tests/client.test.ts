@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createJevClient, JevlintProviderKeyError, JevlintReplayMissError, JevlintRequestError, questionCacheKey, resolveProvider } from '../src/client.js';
+import { createJevClient, JevlintProviderKeyError, JevlintReplayMissError, JevlintRequestError, parseRetryAfter, questionCacheKey, resolveProvider } from '../src/client.js';
 import { judgeFile } from '../src/engine.js';
 import { shardedPath, writeJsonAtomic } from '../src/ledger.js';
 
@@ -267,6 +267,27 @@ describe('request budget', () => {
             expect(fetch).not.toHaveBeenCalled();
         } finally {
             rmSync(cacheDir, { recursive: true, force: true });
+        }
+    });
+});
+
+describe('parseRetryAfter', () => {
+    const now = Date.parse('Wed, 21 Oct 2015 07:28:00 GMT');
+
+    it('reads delay-seconds', () => {
+        expect(parseRetryAfter('120', now)).toBe(120);
+        expect(parseRetryAfter(' 7 ', now)).toBe(7);
+    });
+
+    it('reads an HTTP-date as seconds from now', () => {
+        expect(parseRetryAfter('Wed, 21 Oct 2015 07:28:30 GMT', now)).toBe(30);
+        expect(parseRetryAfter('Wednesday, 21-Oct-15 07:29:00 GMT', now)).toBe(60);
+        expect(parseRetryAfter('Wed Oct 21 07:28:10 2015', now)).toBe(10);
+    });
+
+    it('ignores missing, malformed, negative, zero and past values', () => {
+        for (const value of [null, '', '  ', '-5', '0', '1.5', '1e2', '0x10', 'soon', 'Wed, 21 Oct 2015 07:27:00 GMT', 'Wed, 99 Foo 2015 07:28:30 GMT']) {
+            expect(parseRetryAfter(value, now), String(value)).toBeUndefined();
         }
     });
 });

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `Retry-After` is parsed per RFC 9110: delay-seconds or an HTTP-date. Malformed, negative or past values are ignored and fall back to backoff; the hold stays capped at 90 s.
+
 ## 0.1.1
 
 - Plain-text and JSON files are judged in bounded line chunks instead of one oversized request. Whole-file rules still skip oversized files.
